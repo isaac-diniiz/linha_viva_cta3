@@ -1,0 +1,37 @@
+name: Verificar Linha Viva
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run test:db
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx supabase start
+      - name: Configurar cliente para a instância local
+        run: |
+          echo 'VITE_SUPABASE_URL=http://127.0.0.1:54321' > .env.local
+          npx supabase status -o env | sed -n 's/^ANON_KEY=/VITE_SUPABASE_ANON_KEY=/p' >> .env.local
+          test -s .env.local
+      - run: npm run test:db:supabase
+      - run: npm run test:e2e
+        env:
+          E2E_LOCAL_SUPABASE: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failures
+          path: test-results/

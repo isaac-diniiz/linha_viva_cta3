@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-server/
+.tools/
+.npm-cache/
+.env
+.env.local
+playwright-report/
+test-results/
+artifacts/
+.supabase/
+supabase/.temp/
