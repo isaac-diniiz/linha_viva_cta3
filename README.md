@@ -12,7 +12,14 @@ Esta demonstração temporária usa o computador do professor como servidor e um
 4. Os alunos apontam a câmera do celular para o QR Code ou abrem o link dos alunos, em qualquer rede com internet. O professor clica em **Iniciar atividade**; o QR Code sai da projeção para dar espaço à linha. Cada um arrasta seu cartão ou usa o controle de posição; a projeção mostra o arraste ao vivo e a confirmação ao soltar.
 5. Para encerrar o teste, clique em **Encerrar** ou **Reiniciar demonstração** conforme necessário. `Ctrl+C` no terminal desliga o link e apaga a sessão em memória. Ao reiniciar, o código e os links mudam.
 
-O professor recebe **Evaporação**. Os alunos recebem **Evaporação**, **Condensação** e **Precipitação**, nessa ordem; após o terceiro aluno, a sequência recomeça. O cartão do professor é uma ocorrência separada e não altera essa sequência. Cada ocorrência tem identidade própria, entra e permanece separada na linha; o eixo mostra a quantidade de cartões confirmados. A demo admite até 40 alunos e reconecta o mesmo navegador ao cartão que já recebeu.
+Na tela do professor há o menu **Tema da atividade**. Enquanto a atividade está aguardando, o professor escolhe o tema e a turma já conectada recebe cartões novos, no mesmo código e link. Depois de **Iniciar atividade** a escolha fica travada; para mudar, use **Reiniciar demonstração** e escolha de novo. Temas disponíveis:
+
+- **Ciclo da água** (tema inicial): o professor recebe **Evaporação**. Os alunos recebem **Evaporação**, **Condensação** e **Precipitação**, nessa ordem; após o terceiro aluno, a sequência recomeça.
+- **Linha do tempo do Brasil**: o eixo vai de **Mais antigo** (esquerda) a **Mais recente** (direita). São dez acontecimentos, entregues embaralhados e **sem datas** nos cartões: Chegada de Cabral ao Brasil, Fundação de Salvador, Morte de Zumbi dos Palmares, Inconfidência Mineira, Chegada da família real portuguesa, Independência do Brasil, Assinatura da Lei Áurea, Proclamação da República, Inauguração de Brasília e Promulgação da Constituição Cidadã. Os anos só aparecem em **Revelar referência**.
+- **Planetas do Sistema Solar**: oito planetas, do mais perto ao mais longe do Sol.
+- **Metamorfose da borboleta**: ovo, lagarta, crisálida e borboleta.
+
+Nos temas embaralhados, o professor recebe um cartão e os alunos recebem os demais antes de qualquer repetição. Para abrir a demonstração já em outro tema, defina `LINHA_VIVA_TEMA` (`ciclo-da-agua`, `historia`, `sistema-solar` ou `metamorfose`). No PowerShell, por exemplo: `$env:LINHA_VIVA_TEMA = "historia"; npm run demo:internet`.
 
 As prévias continuam limitadas a seis mensagens por segundo por arraste. A projeção desenha cada caixa em frames contínuos no navegador e prevê por um curto intervalo entre amostras, inclusive quando dois alunos arrastam ao mesmo tempo. Se um aluno confirmar enquanto outro ainda arrasta, a segunda prévia continua fluida; a confirmação final ainda verifica a versão da linha e pode pedir nova proposta. A opção de reduzir movimento do dispositivo é respeitada.
 
