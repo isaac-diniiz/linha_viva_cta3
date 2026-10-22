@@ -108,17 +108,28 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
     await page
       .getByRole("button", { name: "Confirmar posição escolhida" })
       .click();
+    // Evaporação (alunos 0 e 3, mais o professor) é votada; os outros cartões são únicos
     await expect(
-      page.getByText("Sua caixa foi colocada na linha coletiva."),
+      page.getByText(
+        index === 0 || index === 3
+          ? "Seu voto foi registrado."
+          : "Sua caixa foi colocada na linha coletiva.",
+      ),
     ).toBeVisible();
-    await expect(projection.locator(".confirmed-card")).toHaveCount(index + 1);
+    // cartões repetidos dividem uma só caixa na linha
+    await expect(projection.locator(".confirmed-card")).toHaveCount(
+      Math.min(index + 1, 3),
+    );
   }
-  await expect(teacher.locator(".confirmed-card")).toHaveCount(4);
+  await expect(projection.getByTestId("confirmed-evaporacao")).toContainText(
+    "2 de 3 votaram",
+  );
+  await expect(teacher.locator(".confirmed-card")).toHaveCount(3);
   await students[1].page.reload();
   await expect(students[1].page.locator(".drag-card span")).toHaveText(
     labels[1] ?? "",
   );
-  await expect(students[1].page.locator(".confirmed-card")).toHaveCount(4);
+  await expect(students[1].page.locator(".confirmed-card")).toHaveCount(3);
   await teacher.locator(".drag-card").scrollIntoViewIfNeeded();
   const teacherCard = await teacher.locator(".drag-card").boundingBox();
   const teacherBoard = await teacher.getByTestId("board-track").boundingBox();
@@ -136,7 +147,11 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
   );
   await expect(projection.locator(".preview-card")).toBeVisible();
   await teacher.mouse.up();
-  await expect(projection.locator(".confirmed-card")).toHaveCount(5);
+  // o voto do professor completa o grupo e a linha continua com três caixas
+  await expect(projection.getByTestId("confirmed-evaporacao")).toContainText(
+    "3 de 3 votaram",
+  );
+  await expect(projection.locator(".confirmed-card")).toHaveCount(3);
   for (const { context } of students) await context.close();
   await projection.close();
   await teacher.close();
@@ -190,9 +205,7 @@ test("celular em navegador independente confirma pela alternativa ao arraste", a
   await page
     .getByRole("button", { name: "Confirmar posição escolhida" })
     .click();
-  await expect(
-    page.getByText("Sua caixa foi colocada na linha coletiva."),
-  ).toBeVisible();
+  await expect(page.getByText("Seu voto foi registrado.")).toBeVisible();
   await expect(teacher.locator(".confirmed-card")).toHaveCount(1);
   await teacher.close();
 });

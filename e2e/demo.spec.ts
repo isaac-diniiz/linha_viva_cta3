@@ -114,9 +114,7 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
   await page
     .getByRole("button", { name: "Confirmar posição escolhida" })
     .click();
-  await expect(
-    page.getByText("Sua caixa foi colocada na linha coletiva."),
-  ).toBeVisible();
+  await expect(page.getByText("Seu voto foi registrado.")).toBeVisible();
   await expect(page.locator(".confirmed-card")).toHaveAttribute(
     "style",
     /left: 80%/,

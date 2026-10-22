@@ -73,4 +73,57 @@ describe("projeção coletiva", () => {
       "board-scroll",
     );
   });
+
+  it("informa quantos dos alunos que têm o mesmo cartão já votaram na posição", () => {
+    render(
+      <Board
+        items={items}
+        order={["a", "b"]}
+        positions={{ a: 0.2, b: 0.8 }}
+        votes={{
+          a: { votes: 2, total: 3, marks: [0.1, 0.3] },
+          b: { votes: 1, total: 1, marks: [0.8] },
+        }}
+        previews={{}}
+      />,
+    );
+    expect(screen.getByTestId("confirmed-a")).toHaveTextContent(
+      "2 de 3 votaram",
+    );
+    expect(screen.getByTestId("confirmed-b")).not.toHaveTextContent("votaram");
+  });
+
+  it("marca no eixo cada voto de um cartão repetido, sem nomes", () => {
+    render(
+      <Board
+        items={items}
+        order={["a"]}
+        positions={{ a: 0.2 }}
+        votes={{ a: { votes: 2, total: 3, marks: [0.1, 0.3] } }}
+        previews={{}}
+      />,
+    );
+    expect(screen.getByTestId("vote-mark-a-0")).toHaveStyle({ left: "10%" });
+    expect(screen.getByTestId("vote-mark-a-1")).toHaveStyle({ left: "30%" });
+  });
+
+  it("permite nomear as pontas do eixo, como mais antigo e mais recente", () => {
+    render(
+      <Board
+        items={items}
+        order={[]}
+        startLabel="Mais antigo"
+        endLabel="Mais recente"
+        previews={{}}
+      />,
+    );
+    expect(screen.getByText("MAIS ANTIGO")).toBeInTheDocument();
+    expect(screen.getByText("MAIS RECENTE")).toBeInTheDocument();
+  });
+
+  it("mantém INÍCIO e FIM quando as pontas não são nomeadas", () => {
+    render(<Board items={items} order={[]} previews={{}} />);
+    expect(screen.getByText("INÍCIO")).toBeInTheDocument();
+    expect(screen.getByText("FIM")).toBeInTheDocument();
+  });
 });
