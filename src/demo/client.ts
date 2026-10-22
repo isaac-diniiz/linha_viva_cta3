@@ -5,7 +5,12 @@ import {
   type PreviewState,
 } from "../domain/preview";
 import { newId } from "../domain/id";
-import { canAcceptDemoPreview, type DemoStatus, type LineCard, type ThemeSummary, } from "./domain";
+import {
+  canAcceptDemoPreview,
+  type DemoStatus,
+  type LineCard,
+  type ThemeSummary,
+} from "./domain";
 
 export type DemoSnapshot = {
   code: string;
