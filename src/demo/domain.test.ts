@@ -141,6 +141,35 @@ describe("demonstração na rede local", () => {
     expect(() => confirmDemoMove(state, "celular-a", 0.8, 1)).toThrow(/versão/);
   });
 
+  describe("estados da sessão", () => {
+    it("não pausa uma atividade que ainda não começou", () => {
+      const state = createDemoState();
+      expect(() => setDemoStatus(state, "paused")).toThrow(/não começou/);
+      expect(state.status).toBe("waiting");
+      expect(state.version).toBe(0);
+    });
+
+    it("não repete o estado atual nem muda a versão da linha", () => {
+      const state = createDemoState();
+      setDemoStatus(state, "active");
+      expect(() => setDemoStatus(state, "active")).toThrow(/já está/);
+      setDemoStatus(state, "paused");
+      const version = state.version;
+      expect(() => setDemoStatus(state, "paused")).toThrow(/já está/);
+      expect(state.version).toBe(version);
+    });
+
+    it("encerra a partir de qualquer estado aberto e depois não reabre", () => {
+      for (const path of [[], ["active"], ["active", "paused"]] as const) {
+        const state = createDemoState();
+        for (const step of path) setDemoStatus(state, step);
+        setDemoStatus(state, "ended");
+        expect(state.status).toBe("ended");
+        expect(() => setDemoStatus(state, "active")).toThrow(/encerrada/);
+      }
+    });
+  });
+
   it("guarda a coordenada solta e ordena as caixas da linha pelas posições", () => {
     const state = createDemoState();
     assignStudent(state, "celular-a");

@@ -277,6 +277,10 @@ export function assignStudent(state: DemoState, token: string): string {
 
 export function setDemoStatus(state: DemoState, status: DemoStatus): void {
   if (state.status === "ended") throw new Error("A sessão foi encerrada.");
+  if (state.status === status)
+    throw new Error("A atividade já está nesse estado.");
+  if (status === "paused" && state.status === "waiting")
+    throw new Error("A atividade ainda não começou.");
   state.status = status;
   state.version++;
   state.previewVersionFloor = state.version;
