@@ -17,6 +17,13 @@ test("projeção mostra QR de entrada até a atividade começar", async ({
 }) => {
   const teacher = await browser.newPage();
   await teacher.goto("/demo/professor");
+  // a sessão é única no servidor; outro teste pode tê-la deixado iniciada
+  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  await expect(
+    teacher.getByRole("button", { name: "Iniciar atividade" }),
+  ).toBeEnabled();
   const projection = await browser.newPage();
   await projection.goto("/demo/projetor");
   const studentLink = teacher.getByRole("link", { name: /\/demo\/aluno\// });
