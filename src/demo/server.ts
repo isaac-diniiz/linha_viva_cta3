@@ -6,7 +6,12 @@ import {
   assignStudent,
   canAcceptDemoPreview,
   confirmDemoMove,
+  changeTheme,
   createDemoState,
+  defaultThemeId,
+  lineCards,
+  listThemes,
+  referenceLabels,
   setDemoStatus,
   type DemoStatus,
 } from "./domain";
@@ -19,11 +24,12 @@ export function attachDemoServer(
   {
     publicMode = false,
     teacherKey = randomBytes(24).toString("hex"),
-  }: { publicMode?: boolean; teacherKey?: string } = {},
+    theme = process.env.LINHA_VIVA_TEMA ?? defaultThemeId,
+  }: { publicMode?: boolean; teacherKey?: string; theme?: string } = {},
 ) {
   const projectionKey = randomBytes(24).toString("hex");
-  const newState = () => {
-    const result = createDemoState();
+  const newState = (themeId = theme) => {
+    const result = createDemoState(themeId);
     if (publicMode) result.code = randomBytes(4).toString("hex").toUpperCase();
     return result;
   };
@@ -41,6 +47,9 @@ export function attachDemoServer(
       code: state.code,
       title: state.title,
       instruction: state.instruction,
+      axis: state.axis,
+      themeId: state.themeId,
+      themes: client.role === "teacher" ? listThemes() : undefined,
       items: state.items,
       confirmedOrder: state.confirmedOrder,
       confirmedPositions: state.confirmedPositions,
@@ -50,19 +59,10 @@ export function attachDemoServer(
       revealed: state.revealed,
       previews: state.previews,
       memberCount: Object.keys(state.members).length,
+      cards: lineCards(state),
       reference:
         client.role === "teacher" || state.revealed
-          ? [...state.items]
-              .sort(
-                (a, b) =>
-                  ["evaporacao", "condensacao", "precipitacao"].indexOf(
-                    a.templateId,
-                  ) -
-                  ["evaporacao", "condensacao", "precipitacao"].indexOf(
-                    b.templateId,
-                  ),
-              )
-              .map((item) => item.id)
+          ? referenceLabels(state)
           : undefined,
       ownItemId:
         client.role === "student" && client.token
@@ -204,8 +204,10 @@ export function attachDemoServer(
         } else if (message.type === "reveal") {
           state.revealed = true;
           state.version++;
+        } else if (message.type === "theme") {
+          state = changeTheme(state, String(message.themeId));
         } else if (message.type === "reset") {
-          state = newState();
+          state = newState(state.themeId);
           for (const connected of clients.values())
             if (connected.role === "student" && connected.token)
               assignStudent(state, connected.token);

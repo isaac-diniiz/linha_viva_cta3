@@ -2,8 +2,37 @@ import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Board } from "../components/Board";
 import { DragCard } from "../components/DragCard";
+import { ThemePicker } from "../components/ThemePicker";
 import type { Preview } from "../domain/preview";
-import { useLocalDemo } from "./client";
+import { useLocalDemo, type DemoSnapshot } from "./client";
+
+function boardData(state: DemoSnapshot | null) {
+  const cards = state?.cards ?? [];
+  return {
+    // as caixas da linha são os cartões; as ocorrências dos alunos só dão nome às prévias
+    items: [...cards, ...(state?.items ?? [])],
+    order: state?.confirmedOrder ?? [],
+    positions: state?.confirmedPositions,
+    cardCount: cards.length,
+    startLabel: state?.axis.start,
+    endLabel: state?.axis.end,
+    votes: Object.fromEntries(
+      cards.map((card) => [
+        card.id,
+        { votes: card.votes, total: card.total, marks: card.marks },
+      ]),
+    ),
+  };
+}
+
+/** Mais de uma pessoa recebeu o mesmo cartão, então a posição é votada. */
+function isSharedCard(state: DemoSnapshot | null): boolean {
+  const own = state?.items.find((item) => item.id === state.ownItemId);
+  return (
+    !!own &&
+    (state?.items.filter((item) => item.label === own.label).length ?? 0) > 1
+  );
+}
 
 function Header({ role }: { role: string }) {
   return (
@@ -84,6 +113,7 @@ function Teacher() {
   const [message, setMessage] = useState("");
   const [localPreview, setLocalPreview] = useState<Preview | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const sharedCard = isSharedCard(state);
   const action = (payload: unknown) => {
     try {
       send(payload);
@@ -120,6 +150,14 @@ function Teacher() {
           </a>
           . {state.memberCount} aluno(s) conectado(s).
         </div>
+      )}
+      {state?.themes && (
+        <ThemePicker
+          themes={state.themes}
+          selectedId={state.themeId}
+          disabled={!connected || state.status !== "waiting"}
+          onChoose={(themeId) => action({ type: "theme", themeId })}
+        />
       )}
       <div className="demo-controls">
         <button
@@ -172,9 +210,7 @@ function Teacher() {
       )}
       <Board
         ref={boardRef}
-        items={state?.items ?? []}
-        order={state?.confirmedOrder ?? []}
-        positions={state?.confirmedPositions}
+        {...boardData(state)}
         previews={
           localPreview && state?.ownItemId
             ? { ...state.previews, [state.ownItemId]: localPreview }
@@ -197,7 +233,11 @@ function Teacher() {
             onDrop={async (x, version) => {
               try {
                 await confirm(x, version);
-                setMessage("Seu cartão foi colocado na linha.");
+                setMessage(
+                  sharedCard
+                    ? "Seu voto foi registrado. A caixa fica no consenso de quem tem o mesmo cartão."
+                    : "Seu cartão foi colocado na linha.",
+                );
               } catch (error) {
                 setMessage((error as Error).message);
               } finally {
@@ -209,10 +249,7 @@ function Teacher() {
       )}
       {state?.revealed && (
         <div className="notice" role="status">
-          Referência:{" "}
-          {state.reference
-            ?.map((id) => state.items.find((item) => item.id === id)?.label)
-            .join(" → ")}
+          Referência: {state.reference?.join(" → ")}
         </div>
       )}
     </main>
@@ -281,18 +318,13 @@ function Projection() {
       </section>
       {connected && state?.status === "waiting" && <JoinQr code={state.code} />}
       <Board
-        items={state?.items ?? []}
-        order={state?.confirmedOrder ?? []}
-        positions={state?.confirmedPositions}
+        {...boardData(state)}
         previews={state?.previews ?? {}}
         className="demo-projection-board"
       />
       {state?.revealed && (
         <div className="notice" role="status">
-          Sequência de referência:{" "}
-          {state.reference
-            ?.map((id) => state.items.find((item) => item.id === id)?.label)
-            .join(" → ")}
+          Sequência de referência: {state.reference?.join(" → ")}
         </div>
       )}
     </main>
@@ -313,13 +345,18 @@ function Student({ code }: { code: string }) {
     setLocalPreview(null);
   }, [state?.status, connected]);
   const ownItem = state?.items.find((item) => item.id === state.ownItemId);
+  const sharedCard = isSharedCard(state);
   const disabled = !connected || !state || state.status !== "active" || busy;
   const place = async (x: number, version = state?.version ?? -1) => {
     setBusy(true);
     setMessage("");
     try {
       await confirm(x, version);
-      setMessage("Sua caixa foi colocada na linha coletiva.");
+      setMessage(
+        sharedCard
+          ? "Seu voto foi registrado. A caixa fica no consenso de quem tem o mesmo cartão."
+          : "Sua caixa foi colocada na linha coletiva.",
+      );
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -365,14 +402,19 @@ function Student({ code }: { code: string }) {
           <Board
             ref={boardRef}
             smoothPreviews={false}
-            items={state?.items ?? []}
-            order={state?.confirmedOrder ?? []}
-            positions={state?.confirmedPositions}
+            {...boardData(state)}
             previews={previews}
           />
         </section>
         <aside className="student-side">
           <div className="section-label">Seu item</div>
+          {sharedCard && (
+            <p className="small-help" data-testid="shared-card-hint">
+              Mais colegas têm este mesmo cartão. Cada um vota onde ele deve
+              ficar; a caixa da linha fica no meio das escolhas do grupo.
+              Conversem e ajustem seu voto até chegarem a um acordo.
+            </p>
+          )}
           <div className="own-item-panel">
             {ownItem ? (
               <DragCard
@@ -402,8 +444,8 @@ function Student({ code }: { code: string }) {
               onChange={(event) => setSliderX(Number(event.target.value))}
             />
             <div className="range-labels">
-              <span>Início</span>
-              <span>Fim</span>
+              <span>{state?.axis.start ?? "Início"}</span>
+              <span>{state?.axis.end ?? "Fim"}</span>
             </div>
             <button
               className="button secondary full"

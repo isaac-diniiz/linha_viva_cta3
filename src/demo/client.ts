@@ -5,21 +5,32 @@ import {
   type PreviewState,
 } from "../domain/preview";
 import { newId } from "../domain/id";
-import { canAcceptDemoPreview, type DemoStatus } from "./domain";
+import {
+  canAcceptDemoPreview,
+  type DemoStatus,
+  type LineCard,
+  type ThemeSummary,
+} from "./domain";
 
 export type DemoSnapshot = {
   code: string;
   title: string;
   instruction: string;
+  axis: { start: string; end: string };
+  themeId: string;
+  /** Temas disponíveis; só o professor recebe a lista. */
+  themes?: ThemeSummary[];
   items: { id: string; label: string }[];
   confirmedOrder: string[];
   confirmedPositions: Record<string, number>;
+  cards: LineCard[];
   status: DemoStatus;
   version: number;
   previewVersionFloor: number;
   revealed: boolean;
   previews: PreviewState;
   memberCount: number;
+  /** Etapas da referência, já em texto, uma por cartão. */
   reference?: string[];
   ownItemId?: string;
   projectionKey?: string;

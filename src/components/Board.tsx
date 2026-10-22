@@ -3,17 +3,35 @@ import type { PreviewState } from "../domain/preview";
 import { AnimatedPreviewCard } from "./AnimatedPreviewCard";
 
 export type Item = { id: string; label: string };
+/** Votos dos alunos que têm o mesmo cartão; a posição da caixa é o consenso. */
+export type VoteSummary = { votes: number; total: number; marks: number[] };
 type Props = {
   items: Item[];
   order: string[];
   positions?: Record<string, number>;
+  votes?: Record<string, VoteSummary>;
+  /** Quantas caixas definem a largura do eixo; por padrão, o total de itens. */
+  cardCount?: number;
+  startLabel?: string;
+  endLabel?: string;
   previews: PreviewState;
   className?: string;
   smoothPreviews?: boolean;
 };
 
 export const Board = forwardRef<HTMLDivElement, Props>(function Board(
-  { items, order, positions, previews, className = "", smoothPreviews = true },
+  {
+    items,
+    order,
+    positions,
+    votes,
+    cardCount = items.length,
+    startLabel = "Início",
+    endLabel = "Fim",
+    previews,
+    className = "",
+    smoothPreviews = true,
+  },
   ref,
 ) {
   const labels = new Map(items.map((item) => [item.id, item.label]));
@@ -29,15 +47,28 @@ export const Board = forwardRef<HTMLDivElement, Props>(function Board(
         className="board"
         data-testid="board-track"
         style={{
-          minWidth: items.length > 8 ? `${items.length * 140}px` : "100%",
+          minWidth: cardCount > 8 ? `${cardCount * 140}px` : "100%",
         }}
       >
         <div className="board-topline">
-          <span>INÍCIO</span>
+          <span>{startLabel.toUpperCase()}</span>
           <span>LINHA DA TURMA · {order.length} CARTÕES</span>
-          <span>FIM</span>
+          <span>{endLabel.toUpperCase()}</span>
         </div>
         <div className="board-axis" aria-hidden="true" />
+        {order.flatMap((id) =>
+          votes?.[id] && votes[id].total > 1
+            ? votes[id].marks.map((mark, index) => (
+                <span
+                  key={`vote-${id}-${index}`}
+                  className="vote-mark"
+                  data-testid={`vote-mark-${id}-${index}`}
+                  aria-hidden="true"
+                  style={{ left: `${mark * 100}%` }}
+                />
+              ))
+            : [],
+        )}
         {order.map((id, index) => (
           <div
             key={id}
@@ -52,6 +83,11 @@ export const Board = forwardRef<HTMLDivElement, Props>(function Board(
               {String(index + 1).padStart(2, "0")}
             </span>
             <span>{labels.get(id) ?? "Item"}</span>
+            {votes?.[id] && votes[id].total > 1 && (
+              <span className="vote-count">
+                {votes[id].votes} de {votes[id].total} votaram
+              </span>
+            )}
           </div>
         ))}
         {Object.entries(previews).map(
