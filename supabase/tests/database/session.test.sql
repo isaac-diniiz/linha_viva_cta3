@@ -1,14 +1,15 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(33);
+select plan(39);
 
 insert into auth.users (id, aud, role, email, encrypted_password, email_confirmed_at)
 values
   ('11111111-1111-4111-8111-111111111111', 'authenticated', 'authenticated', 'teacher@example.com', '', now()),
   ('22222222-2222-4222-8222-222222222222', 'authenticated', 'authenticated', null, '', now()),
   ('33333333-3333-4333-8333-333333333333', 'authenticated', 'authenticated', null, '', now()),
-  ('44444444-4444-4444-8444-444444444444', 'authenticated', 'authenticated', null, '', now());
+  ('44444444-4444-4444-8444-444444444444', 'authenticated', 'authenticated', null, '', now()),
+  ('55555555-5555-4555-8555-555555555555', 'authenticated', 'authenticated', 'outro@example.com', '', now());
 
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated","is_anonymous":false}', true);
 set local role authenticated;
@@ -21,10 +22,16 @@ select set_config('app.test_code', (select code from public.sessions limit 1), t
 select set_config('app.test_session', (select id::text from public.sessions limit 1), true);
 select set_config('app.projection_key', public.get_projection_key(current_setting('app.test_session')::uuid), true);
 
+select set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","role":"authenticated","is_anonymous":false}', true);
+select lives_ok($$select public.create_activity('Outra turma', 'Ordene', array['Outro 1','Outro 2','Outro 3'])$$, 'outro professor cria atividade');
+select is((select count(*)::integer from public.activity_items), 3, 'professor lê só os itens das próprias atividades');
+
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated","is_anonymous":true}', true);
 select lives_ok(format('select public.join_session(%L)', current_setting('app.test_code')), 'primeiro aluno entra');
 select is((select count(*)::integer from public.session_members), 1, 'aluno recebeu um item');
 select is((select count(*)::integer from public.activity_answers), 0, 'aluno não lê a resposta');
+select is((select title from public.activities), 'Ciclo da água', 'aluno lê somente a atividade da própria sessão');
+select is((select count(*)::integer from public.activity_items), 3, 'aluno não lê itens de atividades de outros professores');
 
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated","is_anonymous":true}', true);
 select public.join_session(current_setting('app.test_code'));
@@ -37,6 +44,8 @@ select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-8444-4444444
 select throws_ok(format('select public.join_projection(%L, %L)', current_setting('app.test_session'), 'chave-incorreta'), '42501', null, 'chave incorreta não abre projeção');
 select lives_ok(format('select public.join_projection(%L, %L)', current_setting('app.test_session'), current_setting('app.projection_key')), 'projeção entra com chave própria');
 select is((select count(*)::integer from public.sessions where id = current_setting('app.test_session')::uuid), 1, 'projeção lê a sessão');
+select is((select title from public.activities), 'Ciclo da água', 'projeção lê o título da atividade projetada');
+select is((select count(*)::integer from public.activity_items), 3, 'projeção lê só os itens da atividade projetada');
 select is((select count(*)::integer from public.session_members), 0, 'projeção não lê identificadores dos alunos');
 select throws_ok(format('select public.join_session(%L)', current_setting('app.test_code')), '42501', null, 'projeção não vira estudante');
 select throws_ok(format('select public.get_reference(%L)', current_setting('app.test_session')), '42501', null, 'projeção não lê referência antes da revelação');
