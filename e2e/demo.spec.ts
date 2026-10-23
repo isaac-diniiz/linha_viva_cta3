@@ -51,7 +51,7 @@ test("professor, aluno e projeção compartilham o movimento antes da confirmaç
   test.skip(isMobile, "O percurso de arraste é executado no projeto desktop.");
   await page.goto("/");
   await page.getByRole("link", { name: "Professor" }).click();
-  await expect(page.getByText("DEMO1234")).toBeVisible();
+  await expect(page.getByText("CÓDIGO DA TURMA · DEMO1234")).toBeVisible();
   await page.getByRole("button", { name: "Reiniciar demonstração" }).click();
 
   const projection = await browser.newPage();
