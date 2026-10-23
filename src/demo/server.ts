@@ -14,13 +14,21 @@ import {
   INVALID_CODE_MESSAGE,
   lineCards,
   listThemes,
+  ownedItems,
   referenceLabels,
+  resolveOwnItem,
+  setCardsPerParticipant,
   setDemoStatus,
   type DemoStatus,
 } from "./domain";
 
 type Role = "teacher" | "projection" | "student";
 type Client = { role: Role; token?: string };
+
+/** Id de cartão vindo do cliente; ausente quando o participante tem um só. */
+function optionalId(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
 
 const DEFAULT_THEME_ID = "ciclo-da-agua";
 
@@ -59,8 +67,8 @@ export function attachDemoServer(
 ) {
   const catalog = prepareCatalog(activitiesDir, theme);
   const projectionKey = randomBytes(24).toString("hex");
-  const newState = (selected: Theme = catalog.initial) => {
-    const result = createDemoState(selected);
+  const newState = (selected: Theme = catalog.initial, cards = 1) => {
+    const result = createDemoState(selected, Math.random, cards);
     if (publicMode) result.code = randomBytes(4).toString("hex").toUpperCase();
     return result;
   };
@@ -72,7 +80,11 @@ export function attachDemoServer(
     if (socket.readyState === WebSocket.OPEN)
       socket.send(JSON.stringify(message));
   };
-  const snapshot = (client: Client) => ({
+  const ownOf = (client: Client) =>
+    client.role === "projection"
+      ? undefined
+      : ownedItems(state, client.token ?? "", client.role === "teacher");
+  const snapshot = (client: Client, own = ownOf(client)) => ({
     type: "snapshot",
     state: {
       code: state.code,
@@ -96,12 +108,10 @@ export function attachDemoServer(
         client.role === "teacher" || state.revealed
           ? referenceLabels(state)
           : undefined,
-      ownItemId:
-        client.role === "student" && client.token
-          ? state.members[client.token]
-          : client.role === "teacher"
-            ? state.teacherItemId
-            : undefined,
+      cardsPerParticipant: state.cardsPerParticipant,
+      ownItemIds: own,
+      // só os próprios cartões: o aluno vê quais já pôs na linha, sem ver os votos alheios
+      ownPlacedIds: own?.filter((id) => state.votes[id] !== undefined),
       projectionKey: client.role === "teacher" ? projectionKey : undefined,
     },
   });
@@ -183,12 +193,14 @@ export function attachDemoServer(
         if (message.type === "move" || message.type === "cancel") {
           if (client.role === "projection")
             throw new Error("A projeção é somente leitura.");
-          const itemId =
-            client.role === "teacher"
-              ? state.teacherItemId
-              : state.members[client.token ?? ""];
-          if (!itemId || state.status !== "active")
+          if (state.status !== "active")
             throw new Error("Movimentos indisponíveis.");
+          const itemId = resolveOwnItem(
+            state,
+            client.token ?? "",
+            optionalId(message.itemId),
+            client.role === "teacher",
+          );
           const preview = message.preview as Preview;
           if (
             !preview ||
@@ -218,7 +230,10 @@ export function attachDemoServer(
             client.token ?? "",
             Number(message.x),
             Number(message.version),
-            client.role === "teacher",
+            {
+              itemId: optionalId(message.itemId),
+              asTeacher: client.role === "teacher",
+            },
           );
           send(socket, {
             type: "ack",
@@ -243,8 +258,10 @@ export function attachDemoServer(
             state,
             findTheme(catalog.themes, String(message.themeId)),
           );
+        } else if (message.type === "cardsPerParticipant") {
+          state = setCardsPerParticipant(state, Number(message.value));
         } else if (message.type === "reset") {
-          state = newState(state.theme);
+          state = newState(state.theme, state.cardsPerParticipant);
           for (const connected of clients.values())
             if (connected.role === "student" && connected.token)
               assignStudent(state, connected.token);
@@ -264,13 +281,8 @@ export function attachDemoServer(
     });
     socket.on("close", () => {
       const client = clients.get(socket);
-      const itemId =
-        client?.role === "teacher"
-          ? state.teacherItemId
-          : client?.token
-            ? state.members[client.token]
-            : undefined;
-      if (itemId) delete state.previews[itemId];
+      for (const itemId of client ? (ownOf(client) ?? []) : [])
+        delete state.previews[itemId];
       clients.delete(socket);
       publish();
     });

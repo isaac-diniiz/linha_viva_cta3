@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Board } from "../../components/Board";
-import { DragCard } from "../../components/DragCard";
 import type { Preview } from "../../domain/preview";
 import { useLocalDemo } from "../client";
 import { INVALID_CODE_MESSAGE } from "../domain";
-import { boardData, Connection, Header, isSharedCard } from "../shared";
+import {
+  boardData,
+  Connection,
+  Header,
+  isSharedCard,
+  OwnCards,
+  ownCards,
+  placedMessage,
+  replacePreview,
+  withLocalPreviews,
+} from "../shared";
 import { JoinCode } from "./JoinCode";
 
 export function Student({ code }: { code: string }) {
@@ -13,37 +22,40 @@ export function Student({ code }: { code: string }) {
     code,
   );
   const boardRef = useRef<HTMLDivElement>(null);
-  const [localPreview, setLocalPreview] = useState<Preview | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<Record<string, Preview>>(
+    {},
+  );
+  const [chosenId, setChosenId] = useState("");
   const [sliderX, setSliderX] = useState(50);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
-    setLocalPreview(null);
+    setLocalPreviews({});
   }, [state?.status, connected]);
-  const ownItem = state?.items.find((item) => item.id === state.ownItemId);
-  const sharedCard = isSharedCard(state);
+  const cards = ownCards(state);
+  const target = cards.find((card) => card.id === chosenId) ?? cards[0];
+  const anyShared = cards.some((card) => isSharedCard(state, card.id));
   const disabled = !connected || !state || state.status !== "active" || busy;
-  const place = async (x: number, version = state?.version ?? -1) => {
+  const setLocalPreview = (itemId: string, preview: Preview | null) =>
+    setLocalPreviews((current) => replacePreview(current, itemId, preview));
+  const place = async (
+    itemId: string,
+    x: number,
+    version = state?.version ?? -1,
+  ) => {
     setBusy(true);
     setMessage("");
     try {
-      await confirm(x, version);
-      setMessage(
-        sharedCard
-          ? "Seu voto foi registrado. A caixa fica no consenso de quem tem o mesmo cartão."
-          : "Sua caixa foi colocada na linha coletiva.",
-      );
+      await confirm(itemId, x, version);
+      setMessage(placedMessage(isSharedCard(state, itemId)));
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
       setBusy(false);
-      setLocalPreview(null);
+      setLocalPreview(itemId, null);
     }
   };
-  const previews =
-    localPreview && ownItem
-      ? { ...state?.previews, [ownItem.id]: localPreview }
-      : (state?.previews ?? {});
+  const previews = withLocalPreviews(state, localPreviews);
   // código errado ou de uma sessão antiga: pede o código de novo
   if (!state && error === INVALID_CODE_MESSAGE)
     return <JoinCode error={error} />;
@@ -86,18 +98,26 @@ export function Student({ code }: { code: string }) {
           />
         </section>
         <aside className="student-side">
-          <div className="section-label">Seu item</div>
-          {sharedCard && (
+          <div
+            className={`section-label${cards.length > 1 ? " is-visible" : ""}`}
+          >
+            {cards.length > 1 ? `Seus cartões (${cards.length})` : "Seu item"}
+          </div>
+          {anyShared && (
             <p className="small-help" data-testid="shared-card-hint">
-              Mais colegas têm este mesmo cartão. Cada um vota onde ele deve
-              ficar; a caixa da linha fica no meio das escolhas do grupo.
-              Conversem e ajustem seu voto até chegarem a um acordo.
+              {cards.length > 1
+                ? "Colegas têm cartões iguais a alguns dos seus."
+                : "Mais colegas têm este mesmo cartão."}{" "}
+              Cada um vota onde ele deve ficar; a caixa da linha fica no meio
+              das escolhas do grupo. Conversem e ajustem seu voto até chegarem a
+              um acordo.
             </p>
           )}
           <div className="own-item-panel">
-            {ownItem ? (
-              <DragCard
-                label={ownItem.label}
+            {cards.length ? (
+              <OwnCards
+                cards={cards}
+                placedIds={state?.ownPlacedIds ?? []}
                 boardRef={boardRef}
                 version={state?.version ?? 0}
                 disabled={disabled}
@@ -110,6 +130,25 @@ export function Student({ code }: { code: string }) {
             )}
           </div>
           <div className="accessibility-panel">
+            {cards.length > 1 && (
+              <>
+                <label htmlFor="demo-position-card">
+                  Cartão para posicionar
+                </label>
+                <select
+                  id="demo-position-card"
+                  value={target?.id ?? ""}
+                  disabled={disabled}
+                  onChange={(event) => setChosenId(event.target.value)}
+                >
+                  {cards.map((card) => (
+                    <option key={card.id} value={card.id}>
+                      {card.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <label htmlFor="demo-position-range">
               Outra forma de posicionar: escolha um ponto na linha
             </label>
@@ -128,8 +167,8 @@ export function Student({ code }: { code: string }) {
             </div>
             <button
               className="button secondary full"
-              disabled={disabled}
-              onClick={() => void place(sliderX / 100)}
+              disabled={disabled || !target}
+              onClick={() => target && void place(target.id, sliderX / 100)}
             >
               Confirmar posição escolhida
             </button>

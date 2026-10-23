@@ -7,6 +7,10 @@ export type DemoStatus = "waiting" | "active" | "paused" | "ended";
 
 /** Resposta do servidor a um código de turma errado; a tela do aluno pede outro. */
 export const INVALID_CODE_MESSAGE = "Código da turma inválido.";
+
+/** Teto de cartões por participante, para turmas pequenas cobrirem a linha toda. */
+export const MAX_CARDS_PER_PARTICIPANT = 4;
+
 export type DemoState = {
   code: string;
   /** Tema completo, com a ordem correta; nunca enviado inteiro aos clientes. */
@@ -18,7 +22,9 @@ export type DemoState = {
   /** Ordem em que os cartões são entregues aos alunos (ids de cartão). */
   deck: string[];
   items: { id: string; label: string; templateId: string }[];
-  teacherItemId: string;
+  /** Quantos cartões cada participante, professor incluído, recebe. */
+  cardsPerParticipant: number;
+  teacherItemIds: string[];
   /** Voto de cada ocorrência (id do item) na linha, entre 0 e 1. */
   votes: Record<string, number>;
   /** Ordem das caixas da linha: uma por cartão (templateId), não por aluno. */
@@ -29,7 +35,8 @@ export type DemoState = {
   version: number;
   previewVersionFloor: number;
   revealed: boolean;
-  members: Record<string, string>;
+  /** Cartões (ids de item) de cada aluno, pela identidade temporária. */
+  members: Record<string, string[]>;
   previews: PreviewState;
 };
 
@@ -119,13 +126,28 @@ export function referenceLabels(state: DemoState): string[] {
     .map((card) => (card.year ? `${card.label} (${card.year})` : card.label));
 }
 
+/** Cartões por pessoa de fato entregues: ninguém recebe o mesmo cartão duas vezes. */
+function handSize(state: Pick<DemoState, "cardsPerParticipant" | "deck">) {
+  return Math.min(state.cardsPerParticipant, state.deck.length);
+}
+
+function cardAt(state: Pick<DemoState, "theme" | "deck">, position: number) {
+  const id = state.deck[position % state.deck.length];
+  return state.theme.cards.find((card) => card.id === id)!;
+}
+
 export function createDemoState(
   theme: Theme,
   random: () => number = Math.random,
+  cardsPerParticipant = 1,
 ): DemoState {
   const ids = theme.cards.map((card) => card.id);
   const deck = theme.shuffle ? shuffled(ids, random) : ids;
-  const teacherCard = theme.cards.find((card) => card.id === deck[0])!;
+  const hand = Math.min(cardsPerParticipant, deck.length);
+  // o professor recebe o início do baralho; os ids dos seus itens são os do cartão
+  const teacherCards = Array.from({ length: hand }, (_, index) =>
+    cardAt({ theme, deck }, index),
+  );
   return {
     code: "DEMO1234",
     theme,
@@ -134,14 +156,13 @@ export function createDemoState(
     instruction: theme.instruction,
     axis: theme.axis,
     deck,
-    items: [
-      {
-        id: teacherCard.id,
-        label: teacherCard.label,
-        templateId: teacherCard.id,
-      },
-    ],
-    teacherItemId: teacherCard.id,
+    items: teacherCards.map((card) => ({
+      id: card.id,
+      label: card.label,
+      templateId: card.id,
+    })),
+    cardsPerParticipant,
+    teacherItemIds: teacherCards.map((card) => card.id),
     votes: {},
     confirmedOrder: [],
     confirmedPositions: {},
@@ -165,24 +186,95 @@ export function changeTheme(
 ): DemoState {
   if (state.status !== "waiting")
     throw new Error("O tema só pode ser trocado antes de iniciar a atividade.");
-  const next = createDemoState(theme, random);
+  return redeal(state, theme, state.cardsPerParticipant, random);
+}
+
+/**
+ * Muda quantos cartões cada participante recebe, no mesmo código de turma,
+ * reatribuindo os cartões de quem já entrou. Só vale antes de a atividade começar.
+ */
+export function setCardsPerParticipant(
+  state: DemoState,
+  count: number,
+  random: () => number = Math.random,
+): DemoState {
+  if (
+    !Number.isInteger(count) ||
+    count < 1 ||
+    count > MAX_CARDS_PER_PARTICIPANT
+  )
+    throw new Error(
+      `Escolha de 1 a ${MAX_CARDS_PER_PARTICIPANT} cartões por participante.`,
+    );
+  if (state.status !== "waiting")
+    throw new Error(
+      "A quantidade de cartões só pode mudar antes de iniciar a atividade.",
+    );
+  return redeal(state, state.theme, count, random);
+}
+
+function redeal(
+  state: DemoState,
+  theme: Theme,
+  cardsPerParticipant: number,
+  random: () => number,
+): DemoState {
+  const next = createDemoState(theme, random, cardsPerParticipant);
   next.code = state.code;
   for (const token of Object.keys(state.members)) assignStudent(next, token);
   return next;
 }
 
-export function assignStudent(state: DemoState, token: string): string {
+/**
+ * Entrega os cartões de um aluno, seguindo o baralho a partir do último entregue.
+ * Com o cartão do professor reservado, os alunos começam depois da mão dele.
+ */
+export function assignStudent(state: DemoState, token: string): string[] {
   if (state.members[token]) return state.members[token];
-  const { theme } = state;
-  const turn =
-    Object.keys(state.members).length + (theme.teacherCardReserved ? 1 : 0);
-  const template = theme.cards.find(
-    (card) => card.id === state.deck[turn % state.deck.length],
-  )!;
-  const id = crypto.randomUUID();
-  state.items.push({ id, label: template.label, templateId: template.id });
-  state.members[token] = id;
-  return id;
+  const hand = handSize(state);
+  const handed = Object.values(state.members).reduce(
+    (total, ids) => total + ids.length,
+    0,
+  );
+  const start = (state.theme.teacherCardReserved ? hand : 0) + handed;
+  const ids = Array.from({ length: hand }, (_, index) => {
+    const card = cardAt(state, start + index);
+    const id = crypto.randomUUID();
+    state.items.push({ id, label: card.label, templateId: card.id });
+    return id;
+  });
+  state.members[token] = ids;
+  return ids;
+}
+
+/** Cartões que o professor ou um aluno pode mover. */
+export function ownedItems(
+  state: DemoState,
+  token: string,
+  asTeacher = false,
+): string[] {
+  return asTeacher ? state.teacherItemIds : (state.members[token] ?? []);
+}
+
+/**
+ * Confere que o cartão pertence a quem pediu. Com um único cartão, o id pode
+ * ser omitido; com mais de um, é preciso dizer qual.
+ */
+export function resolveOwnItem(
+  state: DemoState,
+  token: string,
+  itemId?: string,
+  asTeacher = false,
+): string {
+  const owned = ownedItems(state, token, asTeacher);
+  if (owned.length === 0)
+    throw new Error("Você não recebeu um item nesta sessão.");
+  if (itemId === undefined) {
+    if (owned.length > 1) throw new Error("Escolha qual cartão confirmar.");
+    return owned[0];
+  }
+  if (!owned.includes(itemId)) throw new Error("Esse cartão não é seu.");
+  return itemId;
 }
 
 export function setDemoStatus(state: DemoState, status: DemoStatus): void {
@@ -209,12 +301,14 @@ export function canAcceptDemoPreview(
   );
 }
 
+export type ConfirmOptions = { itemId?: string; asTeacher?: boolean };
+
 export function confirmDemoMove(
   state: DemoState,
   token: string,
   x: number,
   expectedVersion: number,
-  asTeacher = false,
+  { itemId: requested, asTeacher = false }: ConfirmOptions = {},
 ): number {
   if (state.status !== "active")
     throw new Error(
@@ -222,8 +316,7 @@ export function confirmDemoMove(
         ? "A sessão está aguardando o professor."
         : "Os movimentos estão pausados ou encerrados.",
     );
-  const itemId = asTeacher ? state.teacherItemId : state.members[token];
-  if (!itemId) throw new Error("Você não recebeu um item nesta sessão.");
+  const itemId = resolveOwnItem(state, token, requested, asTeacher);
   if (state.version !== expectedVersion)
     throw new Error("A versão da linha mudou. Confira e tente novamente.");
   if (!Number.isFinite(x) || x < 0 || x > 1)

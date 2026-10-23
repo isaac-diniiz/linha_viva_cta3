@@ -6,7 +6,19 @@ import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { attachDemoServer } from "./server";
 
-type Message = { type: string; message?: string };
+type Message = {
+  type: string;
+  message?: string;
+  requestId?: string;
+  ok?: boolean;
+  state?: {
+    status: string;
+    version: number;
+    cardsPerParticipant: number;
+    ownItemIds?: string[];
+    ownPlacedIds?: string[];
+  };
+};
 
 describe("servidor da demonstração", () => {
   let server: Server | null = null;
@@ -52,5 +64,54 @@ describe("servidor da demonstração", () => {
     await new Promise((done) => setTimeout(done, 150));
     expect(student.received.slice(before[0])).toEqual([]);
     expect(projection.received.slice(before[1])).toEqual([]);
+  });
+
+  it("entrega vários cartões ao aluno, que confirma cada um e não mexe no cartão alheio", async () => {
+    const { code, port } = await start();
+    const teacher = await connect(port, { role: "teacher" });
+    const latest = (received: Message[]) =>
+      [...received].reverse().find((message) => message.type === "snapshot")
+        ?.state;
+    teacher.socket.send(
+      JSON.stringify({ type: "cardsPerParticipant", value: 2 }),
+    );
+    await expect
+      .poll(() => latest(teacher.received)?.cardsPerParticipant)
+      .toBe(2);
+    const student = await connect(port, {
+      role: "student",
+      code,
+      token: "aluno-varios",
+    });
+    await expect
+      .poll(() => latest(student.received)?.ownItemIds?.length)
+      .toBe(2);
+    const [, second] = latest(student.received)!.ownItemIds!;
+    const teacherCard = latest(teacher.received)!.ownItemIds![0];
+    teacher.socket.send(JSON.stringify({ type: "status", status: "active" }));
+    await expect.poll(() => latest(student.received)?.status).toBe("active");
+
+    const confirm = (itemId: string, requestId: string) =>
+      student.socket.send(
+        JSON.stringify({
+          type: "confirm",
+          itemId,
+          x: 0.6,
+          version: latest(student.received)!.version,
+          requestId,
+        }),
+      );
+    const ack = (requestId: string) =>
+      student.received.find(
+        (message) => message.type === "ack" && message.requestId === requestId,
+      );
+    confirm(teacherCard, "alheio");
+    await expect.poll(() => ack("alheio")?.ok).toBe(false);
+    expect(ack("alheio")?.message).toMatch(/não é seu/);
+    confirm(second, "proprio");
+    await expect.poll(() => ack("proprio")?.ok).toBe(true);
+    await expect
+      .poll(() => latest(student.received)?.ownPlacedIds)
+      .toEqual([second]);
   });
 });

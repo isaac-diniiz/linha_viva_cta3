@@ -1,18 +1,32 @@
 import { useRef, useState } from "react";
 import { Board } from "../../components/Board";
-import { DragCard } from "../../components/DragCard";
 import { ThemePicker } from "../../components/ThemePicker";
 import type { Preview } from "../../domain/preview";
 import { useLocalDemo } from "../client";
-import { boardData, Connection, Header, isSharedCard } from "../shared";
+import { MAX_CARDS_PER_PARTICIPANT } from "../domain";
+import {
+  boardData,
+  Connection,
+  Header,
+  isSharedCard,
+  OwnCards,
+  ownCards,
+  placedMessage,
+  replacePreview,
+  withLocalPreviews,
+} from "../shared";
 
 export function Teacher() {
   const { state, connected, error, send, confirm, preview } =
     useLocalDemo("teacher");
   const [message, setMessage] = useState("");
-  const [localPreview, setLocalPreview] = useState<Preview | null>(null);
+  const [localPreviews, setLocalPreviews] = useState<Record<string, Preview>>(
+    {},
+  );
   const boardRef = useRef<HTMLDivElement>(null);
-  const sharedCard = isSharedCard(state);
+  const cards = ownCards(state);
+  const setLocalPreview = (itemId: string, preview: Preview | null) =>
+    setLocalPreviews((current) => replacePreview(current, itemId, preview));
   const action = (payload: unknown) => {
     try {
       send(payload);
@@ -57,6 +71,37 @@ export function Teacher() {
           disabled={!connected || state.status !== "waiting"}
           onChoose={(themeId) => action({ type: "theme", themeId })}
         />
+      )}
+      {state && (
+        <div className="cards-per-participant">
+          <label htmlFor="demo-cards-per-participant">
+            Cartões por participante
+          </label>
+          <select
+            id="demo-cards-per-participant"
+            value={state.cardsPerParticipant}
+            disabled={!connected || state.status !== "waiting"}
+            onChange={(event) =>
+              action({
+                type: "cardsPerParticipant",
+                value: Number(event.target.value),
+              })
+            }
+          >
+            {Array.from(
+              { length: MAX_CARDS_PER_PARTICIPANT },
+              (_, index) => index + 1,
+            ).map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </select>
+          <p className="small-help">
+            Com poucas pessoas, aumente para cobrir a linha toda. Você também
+            recebe essa quantidade. Só muda antes de iniciar.
+          </p>
+        </div>
       )}
       <div className="demo-controls">
         <button
@@ -110,37 +155,30 @@ export function Teacher() {
       <Board
         ref={boardRef}
         {...boardData(state)}
-        previews={
-          localPreview && state?.ownItemId
-            ? { ...state.previews, [state.ownItemId]: localPreview }
-            : (state?.previews ?? {})
-        }
+        previews={withLocalPreviews(state, localPreviews)}
       />
-      {state?.ownItemId && (
+      {state && cards.length > 0 && (
         <section className="own-item-panel">
-          <div className="section-label">Seu cartão, diferente dos alunos</div>
-          <DragCard
-            label={
-              state.items.find((item) => item.id === state.ownItemId)?.label ??
-              "Item"
-            }
+          <div className="section-label">
+            {cards.length > 1 ? "Seus cartões" : "Seu cartão"}, diferentes dos
+            alunos
+          </div>
+          <OwnCards
+            cards={cards}
+            placedIds={state.ownPlacedIds ?? []}
             boardRef={boardRef}
             version={state.version}
             disabled={!connected || state.status !== "active"}
             onLocalPreview={setLocalPreview}
             onPreview={preview}
-            onDrop={async (x, version) => {
+            onDrop={async (itemId, x, version) => {
               try {
-                await confirm(x, version);
-                setMessage(
-                  sharedCard
-                    ? "Seu voto foi registrado. A caixa fica no consenso de quem tem o mesmo cartão."
-                    : "Seu cartão foi colocado na linha.",
-                );
+                await confirm(itemId, x, version);
+                setMessage(placedMessage(isSharedCard(state, itemId), true));
               } catch (error) {
                 setMessage((error as Error).message);
               } finally {
-                setLocalPreview(null);
+                setLocalPreview(itemId, null);
               }
             }}
           />

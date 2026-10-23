@@ -9,8 +9,11 @@ import {
   createDemoState,
   lineCards,
   listThemes,
+  ownedItems,
   referenceLabels,
+  setCardsPerParticipant,
   setDemoStatus,
+  type DemoState,
 } from "./domain";
 import { findTheme, loadActivities } from "./catalog";
 
@@ -35,7 +38,7 @@ describe("demonstração na rede local", () => {
   it("distribui os três cartões em sequência antes de repetir para alunos seguintes", () => {
     const state = createDemoState(water);
     const tokens = ["joao1", "joao2", "joao3", "maria", "ana", "bia", "caio"];
-    const assigned = tokens.map((token) => assignStudent(state, token));
+    const assigned = tokens.map((token) => assignStudent(state, token)[0]);
     expect(
       assigned.map((id) => state.items.find((item) => item.id === id)?.label),
     ).toEqual([
@@ -47,8 +50,8 @@ describe("demonstração na rede local", () => {
       "Precipitação",
       "Evaporação",
     ]);
-    expect(new Set([state.teacherItemId, ...assigned]).size).toBe(8);
-    expect(assignStudent(state, "maria")).toBe(assigned[3]);
+    expect(new Set([...state.teacherItemIds, ...assigned]).size).toBe(8);
+    expect(assignStudent(state, "maria")).toEqual([assigned[3]]);
     expect(state.items).toHaveLength(8);
   });
 
@@ -128,8 +131,8 @@ describe("demonstração na rede local", () => {
   it("atribui um item por identidade e conserva a atribuição na reconexão", () => {
     const state = createDemoState(water);
     const first = assignStudent(state, "celular-a");
-    expect(assignStudent(state, "celular-a")).toBe(first);
-    expect(assignStudent(state, "celular-b")).not.toBe(first);
+    expect(assignStudent(state, "celular-a")).toEqual(first);
+    expect(assignStudent(state, "celular-b")).not.toEqual(first);
   });
 
   it("só confirma o item de um aluno em sessão ativa e com versão atual", () => {
@@ -192,6 +195,104 @@ describe("demonstração na rede local", () => {
     });
   });
 
+  describe("vários cartões por participante", () => {
+    const templateOf = (state: DemoState, id: string) =>
+      state.items.find((item) => item.id === id)?.templateId;
+
+    it("começa com um cartão por participante", () => {
+      expect(createDemoState(water).cardsPerParticipant).toBe(1);
+    });
+
+    it("entrega a quantidade escolhida a professor e alunos, sem repetir antes de esgotar o baralho", () => {
+      const state = setCardsPerParticipant(
+        createDemoState(theme("historia")),
+        3,
+      );
+      const students = ["a", "b", "c"].map((token) =>
+        assignStudent(state, token),
+      );
+      expect(state.teacherItemIds).toHaveLength(3);
+      for (const ids of students) expect(ids).toHaveLength(3);
+      // professor, a e b somam 9 cartões; o primeiro de c é o décimo
+      const firstTen = [...state.teacherItemIds, ...students.flat()]
+        .slice(0, 10)
+        .map((id) => templateOf(state, id));
+      expect(new Set(firstTen).size).toBe(10);
+    });
+
+    it("nunca dá o mesmo cartão duas vezes à mesma pessoa, mesmo pedindo mais do que existe", () => {
+      const state = setCardsPerParticipant(createDemoState(water), 4);
+      const ids = assignStudent(state, "a");
+      expect(ids).toHaveLength(3);
+      expect(new Set(ids.map((id) => templateOf(state, id))).size).toBe(3);
+      expect(state.teacherItemIds).toHaveLength(3);
+    });
+
+    it("aceita de 1 a 4 cartões, só antes de iniciar, mantendo código e participantes", () => {
+      const state = createDemoState(water);
+      state.code = "TURMA123";
+      assignStudent(state, "a");
+      const next = setCardsPerParticipant(state, 2);
+      expect(next.code).toBe("TURMA123");
+      expect(next.cardsPerParticipant).toBe(2);
+      expect(next.members.a).toHaveLength(2);
+      for (const invalid of [0, 5, 1.5, Number.NaN])
+        expect(() => setCardsPerParticipant(state, invalid)).toThrow(/1 a 4/);
+      setDemoStatus(next, "active");
+      expect(() => setCardsPerParticipant(next, 3)).toThrow(/antes de iniciar/);
+    });
+
+    it("mantém a quantidade ao trocar de tema", () => {
+      const next = changeTheme(
+        setCardsPerParticipant(createDemoState(water), 2),
+        theme("metamorfose"),
+      );
+      expect(next.cardsPerParticipant).toBe(2);
+      expect(next.teacherItemIds).toHaveLength(2);
+    });
+
+    it("registra um voto para cada cartão do participante", () => {
+      const state = setCardsPerParticipant(
+        createDemoState(theme("historia")),
+        2,
+      );
+      const [first, second] = assignStudent(state, "a");
+      setDemoStatus(state, "active");
+      confirmDemoMove(state, "a", 0.2, state.version, { itemId: first });
+      confirmDemoMove(state, "a", 0.8, state.version, { itemId: second });
+      expect(state.votes[first]).toBe(0.2);
+      expect(state.votes[second]).toBe(0.8);
+      expect(state.confirmedOrder).toHaveLength(2);
+    });
+
+    it("pede o cartão quando o participante tem mais de um e recusa cartão alheio", () => {
+      const state = setCardsPerParticipant(createDemoState(water), 2);
+      assignStudent(state, "a");
+      const [other] = assignStudent(state, "b");
+      setDemoStatus(state, "active");
+      expect(() => confirmDemoMove(state, "a", 0.5, state.version)).toThrow(
+        /qual cartão/,
+      );
+      for (const itemId of [other, state.teacherItemIds[0]])
+        expect(() =>
+          confirmDemoMove(state, "a", 0.5, state.version, { itemId }),
+        ).toThrow(/não é seu/);
+      expect(ownedItems(state, "a")).toEqual(state.members.a);
+      expect(ownedItems(state, "", true)).toEqual(state.teacherItemIds);
+    });
+
+    it("professor confirma o próprio cartão escolhido", () => {
+      const state = setCardsPerParticipant(createDemoState(water), 2);
+      setDemoStatus(state, "active");
+      const [, second] = state.teacherItemIds;
+      confirmDemoMove(state, "", 0.4, state.version, {
+        itemId: second,
+        asTeacher: true,
+      });
+      expect(state.votes[second]).toBe(0.4);
+    });
+  });
+
   describe("tema de História", () => {
     const history = () => theme("historia");
 
@@ -216,19 +317,20 @@ describe("demonstração na rede local", () => {
 
     it("dá a cada aluno um acontecimento diferente do professor e dos colegas até esgotar os dez", () => {
       const state = createDemoState(theme("historia"));
-      const ids = Array.from({ length: 9 }, (_, index) =>
-        assignStudent(state, `aluno-${index}`),
+      const ids = Array.from(
+        { length: 9 },
+        (_, index) => assignStudent(state, `aluno-${index}`)[0],
       );
       const templates = ids.map(
         (id) => state.items.find((item) => item.id === id)?.templateId,
       );
       const teacherTemplate = state.items.find(
-        (item) => item.id === state.teacherItemId,
+        (item) => item.id === state.teacherItemIds[0],
       )?.templateId;
       expect(new Set(templates).size).toBe(9);
       expect(templates).not.toContain(teacherTemplate);
       // o décimo aluno é o primeiro a repetir um acontecimento
-      const tenth = assignStudent(state, "aluno-9");
+      const [tenth] = assignStudent(state, "aluno-9");
       expect(state.items.find((item) => item.id === tenth)?.templateId).toBe(
         teacherTemplate,
       );
@@ -279,7 +381,7 @@ describe("demonstração na rede local", () => {
       expect(next.title).toMatch(/planetas|Sistema Solar/i);
       expect(next.axis.start).toMatch(/perto/);
       expect(Object.keys(next.members).sort()).toEqual(["aluno-a", "aluno-b"]);
-      for (const itemId of Object.values(next.members)) {
+      for (const itemId of Object.values(next.members).flat()) {
         const item = next.items.find((candidate) => candidate.id === itemId);
         expect(theme("sistema-solar").cards.map((c) => c.label)).toContain(
           item?.label,

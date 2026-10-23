@@ -192,6 +192,60 @@ test("aluno entra pela página inicial digitando o código da turma", async ({
   await teacher.close();
 });
 
+test("com poucas pessoas, cada participante recebe e posiciona vários cartões", async ({
+  browser,
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "A quantidade é escolhida no painel do professor.");
+  const teacher = await browser.newPage();
+  await teacher.goto(
+    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
+  );
+  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  const perParticipant = teacher.getByLabel("Cartões por participante");
+  try {
+    await perParticipant.selectOption("2");
+    await expect(perParticipant).toHaveValue("2");
+    await expect(teacher.locator(".own-cards .drag-card")).toHaveCount(2);
+    const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
+    await page.goto((await share.getAttribute("href"))!);
+    await expect(page.getByText("Seus cartões (2)")).toBeVisible();
+    await expect(page.locator(".drag-card")).toHaveCount(2);
+    const projection = await browser.newPage();
+    await projection.goto(
+      (await teacher
+        .getByRole("link", { name: "Abrir projeção ↗" })
+        .getAttribute("href"))!,
+    );
+    await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
+    await expect(perParticipant).toBeDisabled();
+
+    const chooser = page.getByLabel("Cartão para posicionar");
+    const options = await chooser.locator("option").allTextContents();
+    for (const [index, label] of options.entries()) {
+      await chooser.selectOption({ label });
+      await page
+        .getByRole("slider", { name: /Outra forma de posicionar/ })
+        .fill(index ? "80" : "20");
+      await page
+        .getByRole("button", { name: "Confirmar posição escolhida" })
+        .click();
+      await expect(page.getByText("✓ na linha")).toHaveCount(index + 1);
+    }
+    await expect(projection.locator(".confirmed-card")).toHaveCount(2);
+    await projection.close();
+  } finally {
+    // devolve um cartão por participante: reiniciar preserva a quantidade
+    await reset.click();
+    await perParticipant.selectOption("1");
+    await expect(perParticipant).toHaveValue("1");
+    await teacher.close();
+  }
+});
+
 test("link sem chave não controla o professor nem lê a projeção", async ({
   browser,
 }) => {
