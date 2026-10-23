@@ -72,7 +72,7 @@ test("professor escolhe a atividade por disciplina e os alunos recebem cartões 
       narrative.titulo,
     );
     const student = await browser.newPage();
-    await student.goto("/demo/aluno");
+    await student.goto("/demo/aluno/DEMO1234");
     const card = student.locator(".drag-card > span");
     await expect(card).toHaveText(
       new RegExp(
@@ -108,7 +108,7 @@ test("professor, aluno e projeção compartilham o movimento antes da confirmaç
   const projection = await browser.newPage();
   await projection.goto("/demo/projetor");
   const student = await browser.newPage();
-  await student.goto("/demo/aluno");
+  await student.goto("/demo/aluno/DEMO1234");
   const card = student.locator(".drag-card");
   await expect(card).toBeDisabled();
   await page.getByRole("button", { name: "Iniciar atividade" }).click();
@@ -163,7 +163,7 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
   ).toBeEnabled();
   await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
   await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
-  await page.goto("/demo/aluno");
+  await page.goto("/demo/aluno/DEMO1234");
   const card = page.locator(".drag-card");
   await expect(card).toBeEnabled();
   await page

@@ -162,6 +162,36 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
   await teacher.close();
 });
 
+test("aluno entra pela página inicial digitando o código da turma", async ({
+  browser,
+  page,
+}) => {
+  const teacher = await browser.newPage();
+  await teacher.goto(
+    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
+  );
+  const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
+  await expect(share).toBeVisible();
+  const code = (await share.getAttribute("href"))!.split("/").pop()!;
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Aluno" }).click();
+  const input = page.getByLabel(/código da turma/i);
+  await expect(input).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+
+  await input.fill("ERRADO99");
+  await page.getByRole("button", { name: /Entrar/ }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Código da turma inválido",
+  );
+  await page.getByLabel(/código da turma/i).fill(code.toLowerCase());
+  await page.getByRole("button", { name: /Entrar/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/demo/aluno/${code}$`));
+  await expect(page.locator(".drag-card")).toBeVisible();
+  await teacher.close();
+});
+
 test("link sem chave não controla o professor nem lê a projeção", async ({
   browser,
 }) => {

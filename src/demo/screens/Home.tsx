@@ -24,8 +24,9 @@ export function Home() {
             </a>
           </div>
           <p className="small-help">
-            Código de demonstração: <strong>DEMO1234</strong>. Os dados são
-            apagados ao parar o servidor local.
+            Alunos entram pelo QR Code da projeção ou digitando o código da
+            turma. Os dados ficam só na memória do servidor e são apagados
+            quando ele reinicia.
           </p>
         </div>
         <img

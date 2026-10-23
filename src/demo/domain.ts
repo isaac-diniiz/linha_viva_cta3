@@ -4,6 +4,9 @@ import type { Theme } from "./activity";
 export type { Theme, ThemeCard } from "./activity";
 
 export type DemoStatus = "waiting" | "active" | "paused" | "ended";
+
+/** Resposta do servidor a um código de turma errado; a tela do aluno pede outro. */
+export const INVALID_CODE_MESSAGE = "Código da turma inválido.";
 export type DemoState = {
   code: string;
   /** Tema completo, com a ordem correta; nunca enviado inteiro aos clientes. */

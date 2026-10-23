@@ -3,7 +3,9 @@ import { Board } from "../../components/Board";
 import { DragCard } from "../../components/DragCard";
 import type { Preview } from "../../domain/preview";
 import { useLocalDemo } from "../client";
+import { INVALID_CODE_MESSAGE } from "../domain";
 import { boardData, Connection, Header, isSharedCard } from "../shared";
+import { JoinCode } from "./JoinCode";
 
 export function Student({ code }: { code: string }) {
   const { state, connected, error, confirm, preview } = useLocalDemo(
@@ -42,6 +44,9 @@ export function Student({ code }: { code: string }) {
     localPreview && ownItem
       ? { ...state?.previews, [ownItem.id]: localPreview }
       : (state?.previews ?? {});
+  // código errado ou de uma sessão antiga: pede o código de novo
+  if (!state && error === INVALID_CODE_MESSAGE)
+    return <JoinCode error={error} />;
   return (
     <main className="app-shell student-shell demo-shell">
       <Header role="ALUNO" />

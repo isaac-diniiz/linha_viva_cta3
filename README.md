@@ -17,7 +17,7 @@ Não precisa de conta nem de internet além da rede local. É o modo usado para 
 
 1. No computador, execute `npm run demo` e deixe o terminal aberto.
 2. Abra `http://localhost:5173`, clique em **Professor** e depois em **Abrir projeção**. Se quiser projetar, mova a aba da projeção para a tela da sala.
-3. Em outro PowerShell, execute `ipconfig` e anote o endereço **IPv4** do adaptador Wi-Fi, por exemplo `192.168.1.23`. No celular, no mesmo Wi-Fi, abra `http://192.168.1.23:5173` (troque pelo seu IPv4) e clique em **Aluno**. O código DEMO1234 já é usado pela demonstração.
+3. Em outro PowerShell, execute `ipconfig` e anote o endereço **IPv4** do adaptador Wi-Fi, por exemplo `192.168.1.23`. No celular, no mesmo Wi-Fi, abra `http://192.168.1.23:5173` (troque pelo seu IPv4), clique em **Aluno** e digite o código **DEMO1234**, fixo no modo local.
 4. No professor, clique em **Iniciar atividade**. No celular, arraste o cartão pela linha e observe a projeção _antes de soltar_: a caixa deve acompanhar o gesto. Solte para confirmar, ou use o controle de posição e **Confirmar posição escolhida**.
 5. Teste **Pausar movimentos**, **Retomar atividade** e **Revelar referência**. Para voltar ao começo, clique em **Reiniciar demonstração**.
 
