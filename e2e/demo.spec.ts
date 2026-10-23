@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 test.skip(
@@ -41,6 +42,56 @@ test("projeção mostra QR de entrada até a atividade começar", async ({
   await expect(qr).toHaveCount(0);
   await projection.close();
   await teacher.close();
+});
+
+test("professor escolhe a atividade por disciplina e os alunos recebem cartões dela", async ({
+  browser,
+  isMobile,
+}) => {
+  test.skip(isMobile, "A escolha da atividade é feita no painel do professor.");
+  const narrative = JSON.parse(
+    readFileSync("atividades/narrativa-viva.json", "utf8"),
+  ) as { titulo: string; cartoes: { texto: string }[] };
+  const teacher = await browser.newPage();
+  await teacher.goto("/demo/professor");
+  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  const portuguese = teacher.getByRole("group", { name: "Língua Portuguesa" });
+  try {
+    // o rádio só fica marcado quando o servidor confirma a troca
+    const option = portuguese.getByRole("radio", { name: /Narrativa Viva/ });
+    await option.click();
+    await expect(option).toBeChecked();
+    await expect(teacher.getByRole("heading", { level: 1 })).toHaveText(
+      narrative.titulo,
+    );
+    const projection = await browser.newPage();
+    await projection.goto("/demo/projetor");
+    await expect(projection.getByRole("heading", { level: 1 })).toHaveText(
+      narrative.titulo,
+    );
+    const student = await browser.newPage();
+    await student.goto("/demo/aluno");
+    const card = student.locator(".drag-card > span");
+    await expect(card).toHaveText(
+      new RegExp(
+        `^(${narrative.cartoes
+          .map(({ texto }) => texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join("|")})$`,
+      ),
+    );
+    await student.close();
+    await projection.close();
+  } finally {
+    // devolve o tema inicial, usado pelos demais testes da sessão única
+    const initial = teacher
+      .getByRole("group", { name: "Ciências" })
+      .getByRole("radio", { name: /Ciclo da água/ });
+    await initial.click();
+    await expect(initial).toBeChecked();
+    await teacher.close();
+  }
 });
 
 test("professor, aluno e projeção compartilham o movimento antes da confirmação", async ({
