@@ -58,6 +58,7 @@ Não começar por biblioteca extensa de atividades, contas de estudantes, chat, 
 - Limites aceitos: uma sessão por servidor, estado em memória que se perde ao reiniciar o processo e permissões verificadas no servidor Node, não por RLS.
 - A pilha Supabase descrita abaixo continua no repositório e na CI, mas fica congelada até depois da validação. Antes de retomá-la, corrigir as políticas `activities_teacher` e `items_for_session`, cujas colunas sem qualificação nas subconsultas fazem o estudante não ler a própria atividade e ler itens de atividades de outros professores, e cobrir esses casos com pgTAP.
 - Estados da sessão na demonstração: `waiting → active`, `active ⇄ paused` e qualquer estado aberto `→ ended`. Pausar antes de iniciar e repetir o estado atual são rejeitados sem alterar a versão.
+- Hospedagem (decisão de 22/out/2026): Render no plano gratuito, configurado por `render.yaml` e documentado em `docs/hospedagem.md`. O plano dorme após 15 min sem requisições nem mensagens WebSocket; por isso cada cliente envia `{ "type": "ping" }` a cada 60 s (`HEARTBEAT_MS` em `src/demo/client.ts`), e o servidor aceita a pulsação de qualquer papel sem responder. `DEMO_TEACHER_KEY` fica no painel do Render, nunca no repositório. Se o ensaio com dispositivos reais mostrar risco, a alternativa avaliada é o Fly.io pago, com região em São Paulo.
 
 ## Stack definida para o primeiro MVP (pilha Supabase, retomada após a validação)
 
