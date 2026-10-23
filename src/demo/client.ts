@@ -32,7 +32,12 @@ export type DemoSnapshot = {
   memberCount: number;
   /** Etapas da referência, já em texto, uma por cartão. */
   reference?: string[];
-  ownItemId?: string;
+  /** Quantos cartões cada participante recebe nesta sessão. */
+  cardsPerParticipant: number;
+  /** Cartões de quem recebeu este estado (professor ou aluno). */
+  ownItemIds?: string[];
+  /** Cartões próprios que já têm posição confirmada na linha. */
+  ownPlacedIds?: string[];
   projectionKey?: string;
 };
 type Role = "teacher" | "projection" | "student";
@@ -156,12 +161,12 @@ export function useLocalDemo(role: Role, code = "DEMO1234") {
     socketRef.current.send(JSON.stringify(message));
   }, []);
   const confirm = useCallback(
-    (x: number, version: number) =>
+    (itemId: string, x: number, version: number) =>
       new Promise<void>((resolve, reject) => {
         const requestId = newId();
         pending.current.set(requestId, { resolve, reject });
         try {
-          send({ type: "confirm", x, version, requestId });
+          send({ type: "confirm", itemId, x, version, requestId });
         } catch (error) {
           pending.current.delete(requestId);
           reject(error);
@@ -170,9 +175,9 @@ export function useLocalDemo(role: Role, code = "DEMO1234") {
     [send],
   );
   const preview = useCallback(
-    (value: Preview, event: "move" | "cancel") => {
+    (itemId: string, value: Preview, event: "move" | "cancel") => {
       if (socketRef.current?.readyState === WebSocket.OPEN)
-        send({ type: event, preview: value });
+        send({ type: event, itemId, preview: value });
     },
     [send],
   );

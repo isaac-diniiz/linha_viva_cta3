@@ -1533,6 +1533,11 @@ body {
 .student-side > .section-label {
   display: none;
 }
+/* com vários cartões, o rótulo avisa quantos são, acima deles */
+.student-side > .section-label.is-visible {
+  display: block;
+  order: -3;
+}
 .own-item-panel {
   order: -2;
   padding: 12px;
@@ -1814,4 +1819,63 @@ body {
 .theme-count {
   font-size: 12px;
   color: #3f7482;
+}
+
+/* vários cartões por participante */
+.own-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.own-cards li {
+  position: relative;
+}
+/* com mais de um cartão, cartões mais baixos para caberem no celular */
+.own-cards:has(li + li) .drag-card {
+  min-height: 64px;
+}
+.placed-mark {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fffffff0;
+  color: #12516b;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.accessibility-panel select,
+.cards-per-participant select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 8px 0 14px;
+  padding: 8px 12px;
+  border: 2px solid #c8dbd1;
+  border-radius: 10px;
+  background: #fff;
+  color: #173a49;
+  font: inherit;
+  font-weight: 700;
+}
+.cards-per-participant {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #9acbcd;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #fafffded, #dcf7eae8);
+}
+.cards-per-participant label {
+  font-weight: 800;
+  color: #12516b;
+}
+.cards-per-participant select {
+  max-width: 120px;
+}
+.cards-per-participant .small-help {
+  margin-top: 4px !important;
 }
