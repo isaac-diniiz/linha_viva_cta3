@@ -1,0 +1,18 @@
+# Blueprint do Render para a demonstração hospedada (docs/hospedagem.md).
+services:
+  - type: web
+    name: linha-viva
+    runtime: docker
+    dockerfilePath: ./Dockerfile.demo
+    plan: free
+    # região mais próxima do Brasil entre as disponíveis
+    region: virginia
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      # chave fixa do link do professor; definida no painel, nunca no repositório
+      - key: DEMO_TEACHER_KEY
+        sync: false
+      - key: LINHA_VIVA_TEMA
+        value: ciclo-da-agua

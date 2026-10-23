@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { demoLinks } from "./links";
 import { attachDemoServer } from "./server";
 
 const root = resolve(process.cwd(), "dist");
@@ -43,7 +44,11 @@ const { teacherKey, code } = attachDemoServer(server, {
 });
 const port = Number(process.env.PORT ?? 4173);
 server.listen(port, "0.0.0.0", () => {
-  const base = process.env.DEMO_PUBLIC_URL ?? `http://localhost:${port}`;
-  console.log(`Professor: ${base}/demo/professor?key=${teacherKey}`);
-  console.log(`Alunos: ${base}/demo/aluno/${code}`);
+  const links = demoLinks({ env: process.env, port, teacherKey, code });
+  console.log(`Professor: ${links.teacher}`);
+  console.log(`Alunos: ${links.students}`);
+  if (process.env.RENDER_EXTERNAL_URL && !process.env.DEMO_TEACHER_KEY)
+    console.warn(
+      "DEMO_TEACHER_KEY não definida: o link do professor muda a cada reinício.",
+    );
 });
