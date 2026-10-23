@@ -37,6 +37,12 @@ export type DemoSnapshot = {
 };
 type Role = "teacher" | "projection" | "student";
 
+/**
+ * Intervalo da pulsação enviada ao servidor. Mantém o serviço hospedado acordado
+ * enquanto a turma conversa sem mover cartões (o Render dorme após 15 min sem mensagens).
+ */
+export const HEARTBEAT_MS = 60_000;
+
 function studentToken(): string {
   let token = localStorage.getItem("linha-viva-demo-student");
   if (!token) {
@@ -59,12 +65,18 @@ export function useLocalDemo(role: Role, code = "DEMO1234") {
   useEffect(() => {
     let alive = true;
     let retry: number;
+    let heartbeat: number | undefined;
     const connect = () => {
       const protocol = location.protocol === "https:" ? "wss:" : "ws:";
       const socket = new WebSocket(`${protocol}//${location.host}/demo-ws`);
       socketRef.current = socket;
       socket.onopen = () => {
         if (alive) setConnected(true);
+        window.clearInterval(heartbeat);
+        heartbeat = window.setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN)
+            socket.send(JSON.stringify({ type: "ping" }));
+        }, HEARTBEAT_MS);
         socket.send(
           JSON.stringify({
             type: "join",
@@ -116,6 +128,7 @@ export function useLocalDemo(role: Role, code = "DEMO1234") {
         }
       };
       socket.onclose = () => {
+        window.clearInterval(heartbeat);
         if (!alive) return;
         setConnected(false);
         for (const request of pending.current.values())
@@ -132,6 +145,7 @@ export function useLocalDemo(role: Role, code = "DEMO1234") {
     return () => {
       alive = false;
       window.clearTimeout(retry);
+      window.clearInterval(heartbeat);
       socketRef.current?.close();
     };
   }, [role, code, key]);

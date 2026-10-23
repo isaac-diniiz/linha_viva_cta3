@@ -138,6 +138,8 @@ export function attachDemoServer(
     socket.on("message", (raw) => {
       try {
         const message = JSON.parse(raw.toString()) as Record<string, unknown>;
+        // pulsação dos clientes: só mantém o serviço hospedado acordado
+        if (message.type === "ping") return;
         if (message.type === "join") {
           const role = message.role;
           if (role !== "teacher" && role !== "projection" && role !== "student")
