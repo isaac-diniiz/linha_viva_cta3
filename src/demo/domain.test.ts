@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assignStudent,
@@ -10,12 +11,16 @@ import {
   listThemes,
   referenceLabels,
   setDemoStatus,
-  themes,
 } from "./domain";
+import { findTheme, loadActivities } from "./catalog";
+
+const { themes: catalog } = loadActivities(resolve("atividades"));
+const theme = (id: string) => findTheme(catalog, id);
+const water = theme("ciclo-da-agua");
 
 describe("demonstração na rede local", () => {
   it("mantém a prévia de outro arraste após uma confirmação concorrente e bloqueia gesto de antes da pausa", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     assignStudent(state, "aluno-a");
     assignStudent(state, "aluno-b");
     setDemoStatus(state, "active");
@@ -28,7 +33,7 @@ describe("demonstração na rede local", () => {
     expect(canAcceptDemoPreview(state, state.version)).toBe(true);
   });
   it("distribui os três cartões em sequência antes de repetir para alunos seguintes", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     const tokens = ["joao1", "joao2", "joao3", "maria", "ana", "bia", "caio"];
     const assigned = tokens.map((token) => assignStudent(state, token));
     expect(
@@ -48,7 +53,7 @@ describe("demonstração na rede local", () => {
   });
 
   it("mostra uma única caixa na linha para cartões repetidos, com a posição votada pelos alunos", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     const tokens = ["a", "b", "c", "d"];
     tokens.forEach((token) => assignStudent(state, token));
     setDemoStatus(state, "active");
@@ -73,7 +78,7 @@ describe("demonstração na rede local", () => {
   });
 
   it("recalcula o consenso quando um aluno muda seu voto", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     ["a", "b", "c", "d"].forEach((token) => assignStudent(state, token));
     setDemoStatus(state, "active");
     confirmDemoMove(state, "a", 0.1, state.version);
@@ -85,7 +90,7 @@ describe("demonstração na rede local", () => {
   });
 
   it("conta votos e participantes de cada cartão sem identificar quem votou", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     ["a", "b", "c", "d"].forEach((token) => assignStudent(state, token));
     setDemoStatus(state, "active");
     confirmDemoMove(state, "a", 0.1, state.version);
@@ -111,7 +116,7 @@ describe("demonstração na rede local", () => {
   });
 
   it("não deixa cartões do professor e do aluno aparecerem repetidos na referência", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     ["a", "b", "c", "d", "e"].forEach((token) => assignStudent(state, token));
     expect(referenceLabels(state)).toEqual([
       "Evaporação",
@@ -121,14 +126,14 @@ describe("demonstração na rede local", () => {
   });
 
   it("atribui um item por identidade e conserva a atribuição na reconexão", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     const first = assignStudent(state, "celular-a");
     expect(assignStudent(state, "celular-a")).toBe(first);
     expect(assignStudent(state, "celular-b")).not.toBe(first);
   });
 
   it("só confirma o item de um aluno em sessão ativa e com versão atual", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     const id = assignStudent(state, "celular-a");
     expect(() => confirmDemoMove(state, "celular-a", 0.5, 0)).toThrow(
       /aguardando/,
@@ -141,8 +146,37 @@ describe("demonstração na rede local", () => {
     expect(() => confirmDemoMove(state, "celular-a", 0.8, 1)).toThrow(/versão/);
   });
 
+  describe("estados da sessão", () => {
+    it("não pausa uma atividade que ainda não começou", () => {
+      const state = createDemoState(water);
+      expect(() => setDemoStatus(state, "paused")).toThrow(/não começou/);
+      expect(state.status).toBe("waiting");
+      expect(state.version).toBe(0);
+    });
+
+    it("não repete o estado atual nem muda a versão da linha", () => {
+      const state = createDemoState(water);
+      setDemoStatus(state, "active");
+      expect(() => setDemoStatus(state, "active")).toThrow(/já está/);
+      setDemoStatus(state, "paused");
+      const version = state.version;
+      expect(() => setDemoStatus(state, "paused")).toThrow(/já está/);
+      expect(state.version).toBe(version);
+    });
+
+    it("encerra a partir de qualquer estado aberto e depois não reabre", () => {
+      for (const path of [[], ["active"], ["active", "paused"]] as const) {
+        const state = createDemoState(water);
+        for (const step of path) setDemoStatus(state, step);
+        setDemoStatus(state, "ended");
+        expect(state.status).toBe("ended");
+        expect(() => setDemoStatus(state, "active")).toThrow(/encerrada/);
+      }
+    });
+  });
+
   it("guarda a coordenada solta e ordena as caixas da linha pelas posições", () => {
-    const state = createDemoState();
+    const state = createDemoState(water);
     assignStudent(state, "celular-a");
     assignStudent(state, "celular-b");
     setDemoStatus(state, "active");
@@ -159,7 +193,7 @@ describe("demonstração na rede local", () => {
   });
 
   describe("tema de História", () => {
-    const history = () => themes.historia;
+    const history = () => theme("historia");
 
     it("tem dez acontecimentos em ordem cronológica e sem datas nos cartões", () => {
       const cards = history().cards;
@@ -174,14 +208,14 @@ describe("demonstração na rede local", () => {
     });
 
     it("nomeia as pontas do eixo como mais antigo e mais recente", () => {
-      const state = createDemoState("historia");
+      const state = createDemoState(theme("historia"));
       expect(state.axis).toEqual({ start: "Mais antigo", end: "Mais recente" });
       expect(state.instruction).toMatch(/antigo/);
       expect(state.title).toMatch(/Brasil/);
     });
 
     it("dá a cada aluno um acontecimento diferente do professor e dos colegas até esgotar os dez", () => {
-      const state = createDemoState("historia");
+      const state = createDemoState(theme("historia"));
       const ids = Array.from({ length: 9 }, (_, index) =>
         assignStudent(state, `aluno-${index}`),
       );
@@ -202,15 +236,15 @@ describe("demonstração na rede local", () => {
 
     it("embaralha a distribuição para a ordem de entrada não revelar a resposta", () => {
       const chronological = history().cards.map((card) => card.id);
-      const state = createDemoState("historia", () => 0);
+      const state = createDemoState(theme("historia"), () => 0);
       expect([...state.deck].sort()).toEqual([...chronological].sort());
       expect(state.deck).not.toEqual(chronological);
-      const other = createDemoState("historia");
+      const other = createDemoState(theme("historia"));
       expect([...other.deck].sort()).toEqual([...chronological].sort());
     });
 
     it("mostra na referência os acontecimentos do mais antigo ao mais recente, com o ano", () => {
-      const state = createDemoState("historia");
+      const state = createDemoState(theme("historia"));
       for (let index = 0; index < 10; index++)
         assignStudent(state, `aluno-${index}`);
       const reference = referenceLabels(state);
@@ -218,45 +252,28 @@ describe("demonstração na rede local", () => {
       expect(reference[0]).toBe("Chegada de Cabral ao Brasil (1500)");
       expect(reference[9]).toBe("Promulgação da Constituição Cidadã (1988)");
     });
-
-    it("rejeita um tema desconhecido", () => {
-      expect(() => createDemoState("inexistente")).toThrow(/tema/i);
-    });
   });
 
   describe("escolha do tema pelo professor", () => {
-    it("oferece vários temas, sem trocar o tema inicial do Ciclo da água", () => {
-      const list = listThemes();
-      expect(list.map((theme) => theme.id)).toEqual([
-        "ciclo-da-agua",
-        "historia",
-        "sistema-solar",
-        "metamorfose",
-      ]);
-      expect(list[0]).toEqual({
+    it("resume cada atividade do catálogo com disciplina, série e número de cartões", () => {
+      const list = listThemes(catalog);
+      expect(list).toHaveLength(catalog.length);
+      expect(list).toContainEqual({
         id: "ciclo-da-agua",
         title: "Ciclo da água",
+        subject: "Ciências",
+        grade: "5º ano",
         cardCount: 3,
       });
-      expect(createDemoState().themeId).toBe("ciclo-da-agua");
-    });
-
-    it("mantém cada tema válido, com cartões de ids únicos e ao menos três etapas", () => {
-      for (const theme of Object.values(themes)) {
-        const ids = theme.cards.map((card) => card.id);
-        expect(new Set(ids).size).toBe(ids.length);
-        expect(ids.length >= 3).toBe(true);
-        expect(theme.axis.start).toBeTruthy();
-        expect(theme.axis.end).toBeTruthy();
-      }
+      expect(list.map((entry) => entry.id)).toContain("narrativa-viva");
     });
 
     it("troca o tema antes de iniciar, mantendo código e alunos já conectados", () => {
-      const state = createDemoState("ciclo-da-agua");
+      const state = createDemoState(theme("ciclo-da-agua"));
       state.code = "TURMA123";
       assignStudent(state, "aluno-a");
       assignStudent(state, "aluno-b");
-      const next = changeTheme(state, "sistema-solar");
+      const next = changeTheme(state, theme("sistema-solar"));
       expect(next.code).toBe("TURMA123");
       expect(next.themeId).toBe("sistema-solar");
       expect(next.title).toMatch(/planetas|Sistema Solar/i);
@@ -264,7 +281,7 @@ describe("demonstração na rede local", () => {
       expect(Object.keys(next.members).sort()).toEqual(["aluno-a", "aluno-b"]);
       for (const itemId of Object.values(next.members)) {
         const item = next.items.find((candidate) => candidate.id === itemId);
-        expect(themes["sistema-solar"].cards.map((c) => c.label)).toContain(
+        expect(theme("sistema-solar").cards.map((c) => c.label)).toContain(
           item?.label,
         );
       }
@@ -273,21 +290,19 @@ describe("demonstração na rede local", () => {
     });
 
     it("não troca o tema depois que a atividade começou", () => {
-      const state = createDemoState();
+      const state = createDemoState(water);
       setDemoStatus(state, "active");
-      expect(() => changeTheme(state, "historia")).toThrow(/antes de iniciar/);
+      expect(() => changeTheme(state, theme("historia"))).toThrow(
+        /antes de iniciar/,
+      );
       setDemoStatus(state, "paused");
-      expect(() => changeTheme(state, "historia")).toThrow(/antes de iniciar/);
-    });
-
-    it("rejeita um tema que não existe", () => {
-      expect(() => changeTheme(createDemoState(), "inexistente")).toThrow(
-        /tema/i,
+      expect(() => changeTheme(state, theme("historia"))).toThrow(
+        /antes de iniciar/,
       );
     });
 
     it("entrega os planetas e as fases da borboleta em ordem embaralhada e correta na referência", () => {
-      const solar = createDemoState("sistema-solar");
+      const solar = createDemoState(theme("sistema-solar"));
       for (let index = 0; index < 8; index++)
         assignStudent(solar, `aluno-${index}`);
       expect(referenceLabels(solar)).toEqual([
@@ -300,7 +315,7 @@ describe("demonstração na rede local", () => {
         "Urano",
         "Netuno",
       ]);
-      const borboleta = createDemoState("metamorfose");
+      const borboleta = createDemoState(theme("metamorfose"));
       for (let index = 0; index < 4; index++)
         assignStudent(borboleta, `aluno-${index}`);
       expect(referenceLabels(borboleta)).toEqual([

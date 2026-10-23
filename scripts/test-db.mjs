@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { pgtap } from "@electric-sql/pglite-pgtap";
 
@@ -39,14 +39,10 @@ const bootstrap = `
 
 try {
   await db.exec(bootstrap);
-  const migration = await readFile(
-    new URL(
-      "../supabase/migrations/20260924000100_initial.sql",
-      import.meta.url,
-    ),
-    "utf8",
-  );
-  await db.exec(migration);
+  const migrations = new URL("../supabase/migrations/", import.meta.url);
+  for (const file of (await readdir(migrations)).sort())
+    if (file.endsWith(".sql"))
+      await db.exec(await readFile(new URL(file, migrations), "utf8"));
   await db.exec("create extension pgtap with schema extensions");
   const assertions = (
     await readFile(

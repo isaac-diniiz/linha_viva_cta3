@@ -1774,6 +1774,17 @@ body {
   font-weight: 800;
   color: #12516b;
 }
+.theme-subject + .theme-subject {
+  margin-top: 12px;
+}
+.theme-subject-name {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #2a6377;
+}
 .theme-options {
   display: flex;
   flex-wrap: wrap;

@@ -11,6 +11,11 @@ test("QR da projeção acompanha o novo código após reiniciar", async ({
   );
   const studentLink = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(studentLink).toBeVisible();
+  // a sessão é única no servidor; outro teste pode tê-la deixado iniciada
+  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await expect(
+    teacher.getByRole("button", { name: "Iniciar atividade" }),
+  ).toBeEnabled();
   const projectionLink = teacher.getByRole("link", {
     name: "Abrir projeção ↗",
   });

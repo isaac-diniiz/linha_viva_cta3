@@ -105,9 +105,10 @@ test("professor, alunos e projeção acompanham o gesto antes da confirmação",
     board.y + board.height * 0.25,
   );
   await expect(projection.locator('[data-testid^="preview-"]')).toBeVisible();
+  // a prévia animada se move por transform; data-x guarda a última amostra recebida
   await expect(projection.locator('[data-testid^="preview-"]')).toHaveAttribute(
-    "style",
-    /left: 70%/,
+    "data-x",
+    "0.7",
   );
   await expect(projection.locator('[data-testid^="confirmed-"]')).toHaveCount(
     0,

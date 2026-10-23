@@ -1,0 +1,42 @@
+{
+  "id": "narrativa-viva",
+  "disciplina": "Língua Portuguesa",
+  "serie": "4º ano",
+  "titulo": "Narrativa Viva: o girassol de Lia",
+  "instrucao": "Cada um recebeu um trecho da mesma história. Leiam, conversem e montem a narrativa do começo ao fim.",
+  "eixo": { "inicio": "Começo da história", "fim": "Fim da história" },
+  "embaralhar": true,
+  "reservarCartaoDoProfessor": true,
+  "cartoes": [
+    {
+      "id": "semente",
+      "texto": "Lia ganhou da avó uma semente de girassol.",
+      "ordem": 1
+    },
+    {
+      "id": "plantio",
+      "texto": "Ela plantou a semente num vaso perto da janela.",
+      "ordem": 2
+    },
+    {
+      "id": "espera",
+      "texto": "Regou todo dia, mas por semanas nada brotou.",
+      "ordem": 3
+    },
+    {
+      "id": "broto",
+      "texto": "Quando quase desistiu, viu um broto verde.",
+      "ordem": 4
+    },
+    {
+      "id": "crescimento",
+      "texto": "O broto cresceu até passar da altura da janela.",
+      "ordem": 5
+    },
+    {
+      "id": "flor",
+      "texto": "Lia levou para a avó a primeira flor do girassol.",
+      "ordem": 6
+    }
+  ]
+}

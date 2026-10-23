@@ -1,0 +1,72 @@
+{
+  "id": "historia",
+  "disciplina": "História",
+  "serie": "8º ano",
+  "titulo": "Linha do tempo do Brasil",
+  "instrucao": "Cada um recebeu um acontecimento da história do Brasil, sem a data. Conversem e organizem a linha: o mais antigo à esquerda e o mais recente à direita.",
+  "eixo": { "inicio": "Mais antigo", "fim": "Mais recente" },
+  "embaralhar": true,
+  "reservarCartaoDoProfessor": true,
+  "cartoes": [
+    {
+      "id": "cabral",
+      "texto": "Chegada de Cabral ao Brasil",
+      "ordem": 1,
+      "ano": 1500
+    },
+    {
+      "id": "salvador",
+      "texto": "Fundação de Salvador, primeira capital",
+      "ordem": 2,
+      "ano": 1549
+    },
+    {
+      "id": "zumbi",
+      "texto": "Morte de Zumbi dos Palmares",
+      "ordem": 3,
+      "ano": 1695
+    },
+    {
+      "id": "inconfidencia",
+      "texto": "Inconfidência Mineira",
+      "ordem": 4,
+      "ano": 1789
+    },
+    {
+      "id": "familia-real",
+      "texto": "Chegada da família real portuguesa",
+      "ordem": 5,
+      "ano": 1808
+    },
+    {
+      "id": "independencia",
+      "texto": "Independência do Brasil",
+      "ordem": 6,
+      "ano": 1822
+    },
+    {
+      "id": "lei-aurea",
+      "texto": "Assinatura da Lei Áurea",
+      "ordem": 7,
+      "ano": 1888
+    },
+    {
+      "id": "republica",
+      "texto": "Proclamação da República",
+      "ordem": 8,
+      "ano": 1889
+    },
+    {
+      "id": "brasilia",
+      "texto": "Inauguração de Brasília",
+      "ordem": 9,
+      "ano": 1960
+    },
+    {
+      "id": "constituicao",
+      "texto": "Promulgação da Constituição Cidadã",
+      "ordem": 10,
+      "ano": 1988
+    }
+  ]
+}

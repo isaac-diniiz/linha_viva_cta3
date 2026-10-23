@@ -1,0 +1,20 @@
+{
+  "id": "sistema-solar",
+  "disciplina": "Ciências",
+  "serie": "9º ano",
+  "titulo": "Planetas do Sistema Solar",
+  "instrucao": "Cada um recebeu um planeta. Conversem e organizem a linha do mais perto ao mais longe do Sol.",
+  "eixo": { "inicio": "Mais perto do Sol", "fim": "Mais longe do Sol" },
+  "embaralhar": true,
+  "reservarCartaoDoProfessor": true,
+  "cartoes": [
+    { "id": "mercurio", "texto": "Mercúrio", "ordem": 1 },
+    { "id": "venus", "texto": "Vênus", "ordem": 2 },
+    { "id": "terra", "texto": "Terra", "ordem": 3 },
+    { "id": "marte", "texto": "Marte", "ordem": 4 },
+    { "id": "jupiter", "texto": "Júpiter", "ordem": 5 },
+    { "id": "saturno", "texto": "Saturno", "ordem": 6 },
+    { "id": "urano", "texto": "Urano", "ordem": 7 },
+    { "id": "netuno", "texto": "Netuno", "ordem": 8 }
+  ]
+}

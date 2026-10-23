@@ -1,0 +1,13 @@
+{
+  "id": "ciclo-da-agua",
+  "disciplina": "Ciências",
+  "serie": "5º ano",
+  "titulo": "Ciclo da água",
+  "instrucao": "Organize as etapas do ciclo da água na sequência correta.",
+  "eixo": { "inicio": "Início", "fim": "Fim" },
+  "cartoes": [
+    { "id": "evaporacao", "texto": "Evaporação", "ordem": 1 },
+    { "id": "condensacao", "texto": "Condensação", "ordem": 2 },
+    { "id": "precipitacao", "texto": "Precipitação", "ordem": 3 }
+  ]
+}

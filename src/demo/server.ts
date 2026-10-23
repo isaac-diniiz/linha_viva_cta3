@@ -1,14 +1,16 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { randomBytes } from "node:crypto";
+import { resolve } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { acceptPreview, expirePreviews, type Preview } from "../domain/preview";
+import type { Theme } from "./activity";
+import { findTheme, loadActivities } from "./catalog";
 import {
   assignStudent,
   canAcceptDemoPreview,
   confirmDemoMove,
   changeTheme,
   createDemoState,
-  defaultThemeId,
   lineCards,
   listThemes,
   referenceLabels,
@@ -19,17 +21,45 @@ import {
 type Role = "teacher" | "projection" | "student";
 type Client = { role: Role; token?: string };
 
+const DEFAULT_THEME_ID = "ciclo-da-agua";
+
+/** Carrega o catálogo, avisa sobre arquivos rejeitados e escolhe o tema inicial. */
+function prepareCatalog(dir: string, preferredId: string | undefined) {
+  const catalog = loadActivities(dir);
+  for (const { file, errors } of catalog.rejected)
+    console.warn(
+      `Atividade rejeitada (${file}):\n${errors.map((error) => `  - ${error}`).join("\n")}`,
+    );
+  if (catalog.themes.length === 0)
+    throw new Error(`Nenhuma atividade válida em ${dir}.`);
+  const preferred = catalog.themes.find((theme) => theme.id === preferredId);
+  if (preferredId && !preferred)
+    console.warn(`Tema inicial "${preferredId}" não encontrado no catálogo.`);
+  const initial =
+    preferred ??
+    catalog.themes.find((theme) => theme.id === DEFAULT_THEME_ID) ??
+    catalog.themes[0];
+  return { themes: catalog.themes, initial };
+}
+
 export function attachDemoServer(
   httpServer: NonNullable<ViteDevServer["httpServer"]>,
   {
     publicMode = false,
     teacherKey = randomBytes(24).toString("hex"),
-    theme = process.env.LINHA_VIVA_TEMA ?? defaultThemeId,
-  }: { publicMode?: boolean; teacherKey?: string; theme?: string } = {},
+    theme = process.env.LINHA_VIVA_TEMA,
+    activitiesDir = process.env.LINHA_VIVA_ATIVIDADES ?? resolve("atividades"),
+  }: {
+    publicMode?: boolean;
+    teacherKey?: string;
+    theme?: string;
+    activitiesDir?: string;
+  } = {},
 ) {
+  const catalog = prepareCatalog(activitiesDir, theme);
   const projectionKey = randomBytes(24).toString("hex");
-  const newState = (themeId = theme) => {
-    const result = createDemoState(themeId);
+  const newState = (selected: Theme = catalog.initial) => {
+    const result = createDemoState(selected);
     if (publicMode) result.code = randomBytes(4).toString("hex").toUpperCase();
     return result;
   };
@@ -49,7 +79,8 @@ export function attachDemoServer(
       instruction: state.instruction,
       axis: state.axis,
       themeId: state.themeId,
-      themes: client.role === "teacher" ? listThemes() : undefined,
+      themes:
+        client.role === "teacher" ? listThemes(catalog.themes) : undefined,
       items: state.items,
       confirmedOrder: state.confirmedOrder,
       confirmedPositions: state.confirmedPositions,
@@ -107,6 +138,8 @@ export function attachDemoServer(
     socket.on("message", (raw) => {
       try {
         const message = JSON.parse(raw.toString()) as Record<string, unknown>;
+        // pulsação dos clientes: só mantém o serviço hospedado acordado
+        if (message.type === "ping") return;
         if (message.type === "join") {
           const role = message.role;
           if (role !== "teacher" && role !== "projection" && role !== "student")
@@ -205,9 +238,12 @@ export function attachDemoServer(
           state.revealed = true;
           state.version++;
         } else if (message.type === "theme") {
-          state = changeTheme(state, String(message.themeId));
+          state = changeTheme(
+            state,
+            findTheme(catalog.themes, String(message.themeId)),
+          );
         } else if (message.type === "reset") {
-          state = newState(state.themeId);
+          state = newState(state.theme);
           for (const connected of clients.values())
             if (connected.role === "student" && connected.token)
               assignStudent(state, connected.token);

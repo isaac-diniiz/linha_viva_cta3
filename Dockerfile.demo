@@ -11,6 +11,7 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
+COPY --from=build /app/atividades ./atividades
 COPY package.json ./
 EXPOSE 4173
 CMD ["npm", "run", "start:demo"]
