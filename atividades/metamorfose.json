@@ -1,0 +1,16 @@
+{
+  "id": "metamorfose",
+  "disciplina": "Ciências",
+  "serie": "3º ano",
+  "titulo": "Metamorfose da borboleta",
+  "instrucao": "Organize as fases da vida da borboleta na sequência correta.",
+  "eixo": { "inicio": "Início", "fim": "Fim" },
+  "embaralhar": true,
+  "reservarCartaoDoProfessor": true,
+  "cartoes": [
+    { "id": "ovo", "texto": "Ovo", "ordem": 1 },
+    { "id": "lagarta", "texto": "Lagarta", "ordem": 2 },
+    { "id": "crisalida", "texto": "Crisálida", "ordem": 3 },
+    { "id": "borboleta", "texto": "Borboleta", "ordem": 4 }
+  ]
+}

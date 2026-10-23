@@ -1,8 +1,13 @@
 import type { PreviewState } from "../domain/preview";
+import type { Theme } from "./activity";
+
+export type { Theme, ThemeCard } from "./activity";
 
 export type DemoStatus = "waiting" | "active" | "paused" | "ended";
 export type DemoState = {
   code: string;
+  /** Tema completo, com a ordem correta; nunca enviado inteiro aos clientes. */
+  theme: Theme;
   themeId: string;
   title: string;
   instruction: string;
@@ -25,119 +30,23 @@ export type DemoState = {
   previews: PreviewState;
 };
 
-export type ThemeCard = { id: string; label: string; year?: number };
-export type Theme = {
+export type ThemeSummary = {
   id: string;
   title: string;
-  instruction: string;
-  axis: { start: string; end: string };
-  /** Cartões na ordem correta, do início ao fim do eixo. */
-  cards: ThemeCard[];
-  /** Embaralha a distribuição, para a ordem de entrada não entregar a resposta. */
-  shuffle: boolean;
-  /** O cartão do professor sai do baralho dos alunos até todos os outros serem usados. */
-  teacherCardReserved: boolean;
+  subject: string;
+  grade: string;
+  cardCount: number;
 };
 
-export const themes: Record<string, Theme> = {
-  "ciclo-da-agua": {
-    id: "ciclo-da-agua",
-    title: "Ciclo da água",
-    instruction: "Organize as etapas do ciclo da água na sequência correta.",
-    axis: { start: "Início", end: "Fim" },
-    cards: [
-      { id: "evaporacao", label: "Evaporação" },
-      { id: "condensacao", label: "Condensação" },
-      { id: "precipitacao", label: "Precipitação" },
-    ],
-    shuffle: false,
-    teacherCardReserved: false,
-  },
-  historia: {
-    id: "historia",
-    title: "Linha do tempo do Brasil",
-    instruction:
-      "Cada um recebeu um acontecimento da história do Brasil, sem a data. Conversem e organizem a linha: o mais antigo à esquerda e o mais recente à direita.",
-    axis: { start: "Mais antigo", end: "Mais recente" },
-    cards: [
-      { id: "cabral", label: "Chegada de Cabral ao Brasil", year: 1500 },
-      {
-        id: "salvador",
-        label: "Fundação de Salvador, primeira capital",
-        year: 1549,
-      },
-      { id: "zumbi", label: "Morte de Zumbi dos Palmares", year: 1695 },
-      { id: "inconfidencia", label: "Inconfidência Mineira", year: 1789 },
-      {
-        id: "familia-real",
-        label: "Chegada da família real portuguesa",
-        year: 1808,
-      },
-      { id: "independencia", label: "Independência do Brasil", year: 1822 },
-      { id: "lei-aurea", label: "Assinatura da Lei Áurea", year: 1888 },
-      { id: "republica", label: "Proclamação da República", year: 1889 },
-      { id: "brasilia", label: "Inauguração de Brasília", year: 1960 },
-      {
-        id: "constituicao",
-        label: "Promulgação da Constituição Cidadã",
-        year: 1988,
-      },
-    ],
-    shuffle: true,
-    teacherCardReserved: true,
-  },
-  "sistema-solar": {
-    id: "sistema-solar",
-    title: "Planetas do Sistema Solar",
-    instruction:
-      "Cada um recebeu um planeta. Conversem e organizem a linha do mais perto ao mais longe do Sol.",
-    axis: { start: "Mais perto do Sol", end: "Mais longe do Sol" },
-    cards: [
-      { id: "mercurio", label: "Mercúrio" },
-      { id: "venus", label: "Vênus" },
-      { id: "terra", label: "Terra" },
-      { id: "marte", label: "Marte" },
-      { id: "jupiter", label: "Júpiter" },
-      { id: "saturno", label: "Saturno" },
-      { id: "urano", label: "Urano" },
-      { id: "netuno", label: "Netuno" },
-    ],
-    shuffle: true,
-    teacherCardReserved: true,
-  },
-  metamorfose: {
-    id: "metamorfose",
-    title: "Metamorfose da borboleta",
-    instruction: "Organize as fases da vida da borboleta na sequência correta.",
-    axis: { start: "Início", end: "Fim" },
-    cards: [
-      { id: "ovo", label: "Ovo" },
-      { id: "lagarta", label: "Lagarta" },
-      { id: "crisalida", label: "Crisálida" },
-      { id: "borboleta", label: "Borboleta" },
-    ],
-    shuffle: true,
-    teacherCardReserved: true,
-  },
-};
-
-export const defaultThemeId = "ciclo-da-agua";
-
-export type ThemeSummary = { id: string; title: string; cardCount: number };
-
-/** Temas que o professor pode escolher, na ordem do menu. */
-export function listThemes(): ThemeSummary[] {
-  return Object.values(themes).map((theme) => ({
+/** Atividades que o professor pode escolher, sem a ordem correta dos cartões. */
+export function listThemes(themes: Theme[]): ThemeSummary[] {
+  return themes.map((theme) => ({
     id: theme.id,
     title: theme.title,
+    subject: theme.subject,
+    grade: theme.grade,
     cardCount: theme.cards.length,
   }));
-}
-
-export function themeById(id: string): Theme {
-  const theme = themes[id];
-  if (!theme) throw new Error(`Tema desconhecido: ${id}.`);
-  return theme;
 }
 
 function shuffled<T>(list: T[], random: () => number): T[] {
@@ -192,9 +101,7 @@ export function lineCards(state: DemoState): LineCard[] {
   const groups = votesByTemplate(state);
   return state.confirmedOrder.map((id) => ({
     id,
-    label:
-      themeById(state.themeId).cards.find((card) => card.id === id)?.label ??
-      id,
+    label: state.theme.cards.find((card) => card.id === id)?.label ?? id,
     votes: groups.get(id)?.length ?? 0,
     total: state.items.filter((item) => item.templateId === id).length,
     marks: [...(groups.get(id) ?? [])].sort((a, b) => a - b),
@@ -204,22 +111,22 @@ export function lineCards(state: DemoState): LineCard[] {
 /** Etapas da referência, uma por cartão, na ordem correta e com o ano quando houver. */
 export function referenceLabels(state: DemoState): string[] {
   const present = new Set(state.items.map((item) => item.templateId));
-  return themeById(state.themeId)
-    .cards.filter((card) => present.has(card.id))
+  return state.theme.cards
+    .filter((card) => present.has(card.id))
     .map((card) => (card.year ? `${card.label} (${card.year})` : card.label));
 }
 
 export function createDemoState(
-  themeId: string = defaultThemeId,
+  theme: Theme,
   random: () => number = Math.random,
 ): DemoState {
-  const theme = themeById(themeId);
   const ids = theme.cards.map((card) => card.id);
   const deck = theme.shuffle ? shuffled(ids, random) : ids;
   const teacherCard = theme.cards.find((card) => card.id === deck[0])!;
   return {
     code: "DEMO1234",
-    themeId,
+    theme,
+    themeId: theme.id,
     title: theme.title,
     instruction: theme.instruction,
     axis: theme.axis,
@@ -250,12 +157,12 @@ export function createDemoState(
  */
 export function changeTheme(
   state: DemoState,
-  themeId: string,
+  theme: Theme,
   random: () => number = Math.random,
 ): DemoState {
   if (state.status !== "waiting")
     throw new Error("O tema só pode ser trocado antes de iniciar a atividade.");
-  const next = createDemoState(themeId, random);
+  const next = createDemoState(theme, random);
   next.code = state.code;
   for (const token of Object.keys(state.members)) assignStudent(next, token);
   return next;
@@ -263,7 +170,7 @@ export function changeTheme(
 
 export function assignStudent(state: DemoState, token: string): string {
   if (state.members[token]) return state.members[token];
-  const theme = themeById(state.themeId);
+  const { theme } = state;
   const turn =
     Object.keys(state.members).length + (theme.teacherCardReserved ? 1 : 0);
   const template = theme.cards.find(
