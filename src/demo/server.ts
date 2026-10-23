@@ -11,6 +11,7 @@ import {
   confirmDemoMove,
   changeTheme,
   createDemoState,
+  INVALID_CODE_MESSAGE,
   lineCards,
   listThemes,
   referenceLabels,
@@ -155,7 +156,7 @@ export function attachDemoServer(
             throw new Error("Chave da projeção inválida.");
           if (role === "student") {
             if (String(message.code ?? "").toUpperCase() !== state.code)
-              throw new Error("Código da turma inválido.");
+              throw new Error(INVALID_CODE_MESSAGE);
             const token = String(message.token ?? "");
             if (token.length < 8 || token.length > 80)
               throw new Error("Identidade temporária inválida.");
