@@ -24,6 +24,8 @@ export type DemoState = {
   items: { id: string; label: string; templateId: string }[];
   /** Quantos cartões cada participante, professor incluído, recebe. */
   cardsPerParticipant: number;
+  /** O professor recebe cartões e vota como os alunos, ou só conduz. */
+  teacherPlays: boolean;
   teacherItemIds: string[];
   /** Voto de cada ocorrência (id do item) na linha, entre 0 e 1. */
   votes: Record<string, number>;
@@ -136,14 +138,17 @@ function cardAt(state: Pick<DemoState, "theme" | "deck">, position: number) {
   return state.theme.cards.find((card) => card.id === id)!;
 }
 
+/** Como os cartões são distribuídos; o professor escolhe antes de iniciar. */
+export type Deal = { cardsPerParticipant: number; teacherPlays: boolean };
+
 export function createDemoState(
   theme: Theme,
   random: () => number = Math.random,
-  cardsPerParticipant = 1,
+  { cardsPerParticipant = 1, teacherPlays = true }: Partial<Deal> = {},
 ): DemoState {
   const ids = theme.cards.map((card) => card.id);
   const deck = theme.shuffle ? shuffled(ids, random) : ids;
-  const hand = Math.min(cardsPerParticipant, deck.length);
+  const hand = teacherPlays ? Math.min(cardsPerParticipant, deck.length) : 0;
   // o professor recebe o início do baralho; os ids dos seus itens são os do cartão
   const teacherCards = Array.from({ length: hand }, (_, index) =>
     cardAt({ theme, deck }, index),
@@ -162,6 +167,7 @@ export function createDemoState(
       templateId: card.id,
     })),
     cardsPerParticipant,
+    teacherPlays,
     teacherItemIds: teacherCards.map((card) => card.id),
     votes: {},
     confirmedOrder: [],
@@ -186,7 +192,7 @@ export function changeTheme(
 ): DemoState {
   if (state.status !== "waiting")
     throw new Error("O tema só pode ser trocado antes de iniciar a atividade.");
-  return redeal(state, theme, state.cardsPerParticipant, random);
+  return redeal(state, theme, dealOf(state), random);
 }
 
 /**
@@ -210,16 +216,51 @@ export function setCardsPerParticipant(
     throw new Error(
       "A quantidade de cartões só pode mudar antes de iniciar a atividade.",
     );
-  return redeal(state, state.theme, count, random);
+  return redeal(
+    state,
+    state.theme,
+    { ...dealOf(state), cardsPerParticipant: count },
+    random,
+  );
+}
+
+/**
+ * Define se o professor recebe cartões ou só conduz a atividade, no mesmo
+ * código de turma. Só vale antes de a atividade começar.
+ */
+export function setTeacherPlays(
+  state: DemoState,
+  plays: boolean,
+  random: () => number = Math.random,
+): DemoState {
+  if (typeof plays !== "boolean")
+    throw new Error("Informe se o professor participa com cartões.");
+  if (state.status !== "waiting")
+    throw new Error(
+      "A participação do professor só pode mudar antes de iniciar a atividade.",
+    );
+  return redeal(
+    state,
+    state.theme,
+    { ...dealOf(state), teacherPlays: plays },
+    random,
+  );
+}
+
+export function dealOf(state: DemoState): Deal {
+  return {
+    cardsPerParticipant: state.cardsPerParticipant,
+    teacherPlays: state.teacherPlays,
+  };
 }
 
 function redeal(
   state: DemoState,
   theme: Theme,
-  cardsPerParticipant: number,
+  deal: Deal,
   random: () => number,
 ): DemoState {
-  const next = createDemoState(theme, random, cardsPerParticipant);
+  const next = createDemoState(theme, random, deal);
   next.code = state.code;
   for (const token of Object.keys(state.members)) assignStudent(next, token);
   return next;
@@ -227,7 +268,8 @@ function redeal(
 
 /**
  * Entrega os cartões de um aluno, seguindo o baralho a partir do último entregue.
- * Com o cartão do professor reservado, os alunos começam depois da mão dele.
+ * Com o cartão do professor reservado, os alunos começam depois da mão dele;
+ * se o professor não participa, nada fica reservado.
  */
 export function assignStudent(state: DemoState, token: string): string[] {
   if (state.members[token]) return state.members[token];
@@ -236,7 +278,8 @@ export function assignStudent(state: DemoState, token: string): string[] {
     (total, ids) => total + ids.length,
     0,
   );
-  const start = (state.theme.teacherCardReserved ? hand : 0) + handed;
+  const reserved = state.theme.teacherCardReserved && state.teacherPlays;
+  const start = (reserved ? hand : 0) + handed;
   const ids = Array.from({ length: hand }, (_, index) => {
     const card = cardAt(state, start + index);
     const id = crypto.randomUUID();

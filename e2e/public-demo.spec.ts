@@ -246,6 +246,52 @@ test("com poucas pessoas, cada participante recebe e posiciona vários cartões"
   }
 });
 
+test("professor pode só conduzir, sem receber cartões", async ({
+  browser,
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "A escolha é feita no painel do professor.");
+  const teacher = await browser.newPage();
+  await teacher.goto(
+    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
+  );
+  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  const plays = teacher.getByRole("checkbox", {
+    name: "Participar com cartões",
+  });
+  try {
+    await expect(plays).toBeChecked();
+    await expect(teacher.locator(".own-cards .drag-card")).toHaveCount(1);
+    await plays.click();
+    await expect(plays).not.toBeChecked();
+    await expect(teacher.locator(".own-cards .drag-card")).toHaveCount(0);
+    // reiniciar sorteia outro código; espera o link novo antes de usá-lo
+    const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
+    const oldStudentUrl = await share.getAttribute("href");
+    await reset.click();
+    await expect(share).not.toHaveAttribute("href", oldStudentUrl ?? "");
+    await expect(plays).not.toBeChecked();
+
+    await page.goto((await share.getAttribute("href"))!);
+    await expect(page.locator(".drag-card")).toHaveCount(1);
+    await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
+    await expect(plays).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Confirmar posição escolhida" })
+      .click();
+    await expect(teacher.locator(".confirmed-card")).toHaveCount(1);
+  } finally {
+    // devolve a participação do professor, preservada ao reiniciar
+    await reset.click();
+    if (!(await plays.isChecked())) await plays.click();
+    await expect(plays).toBeChecked();
+    await teacher.close();
+  }
+});
+
 test("link sem chave não controla o professor nem lê a projeção", async ({
   browser,
 }) => {

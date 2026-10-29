@@ -74,6 +74,17 @@ export function Teacher() {
       )}
       {state && (
         <div className="cards-per-participant">
+          <label className="teacher-plays">
+            <input
+              type="checkbox"
+              checked={state.teacherPlays}
+              disabled={!connected || state.status !== "waiting"}
+              onChange={(event) =>
+                action({ type: "teacherPlays", value: event.target.checked })
+              }
+            />
+            Participar com cartões
+          </label>
           <label htmlFor="demo-cards-per-participant">
             Cartões por participante
           </label>
@@ -98,8 +109,11 @@ export function Teacher() {
             ))}
           </select>
           <p className="small-help">
-            Com poucas pessoas, aumente para cobrir a linha toda. Você também
-            recebe essa quantidade. Só muda antes de iniciar.
+            Com poucas pessoas, aumente para cobrir a linha toda.{" "}
+            {state.teacherPlays
+              ? "Você também recebe essa quantidade."
+              : "Você só conduz: todos os cartões vão para os alunos."}{" "}
+            Só muda antes de iniciar.
           </p>
         </div>
       )}

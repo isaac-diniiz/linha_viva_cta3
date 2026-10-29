@@ -40,7 +40,7 @@ No painel do professor, o menu **Tema da atividade** agrupa as atividades por di
 
 Quem recebe o mesmo cartão forma um grupo: a linha mostra uma única caixa por cartão, na posição de consenso (mediana) dos votos do grupo, com marcas anônimas de cada voto.
 
-Com poucas pessoas, use **Cartões por participante** no painel do professor, antes de iniciar: cada participante, professor incluído, recebe de 1 a 4 cartões diferentes, e cada um pode ser arrastado ou confirmado pelo controle de posição. Com 3 pessoas e 4 cartões cada, por exemplo, a Linha do tempo do Brasil (10 acontecimentos) fica toda distribuída.
+Com poucas pessoas, use **Cartões por participante** no painel do professor, antes de iniciar: cada participante, professor incluído, recebe de 1 a 4 cartões diferentes, e cada um pode ser arrastado ou confirmado pelo controle de posição. Com 3 pessoas e 4 cartões cada, por exemplo, a Linha do tempo do Brasil (10 acontecimentos) fica toda distribuída. Para só conduzir a atividade, desmarque **Participar com cartões**: o professor deixa de receber cartões, e todos vão para os alunos.
 
 As prévias são limitadas a seis mensagens por segundo por arraste. A projeção desenha cada caixa em frames contínuos e prevê por um curto intervalo entre amostras, inclusive quando dois alunos arrastam ao mesmo tempo. Se um aluno confirmar enquanto outro ainda arrasta, a segunda prévia continua fluida; a confirmação final verifica a versão da linha e pode pedir nova proposta. A opção de reduzir movimento do dispositivo é respeitada.
 

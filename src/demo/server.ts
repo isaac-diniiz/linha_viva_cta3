@@ -11,6 +11,7 @@ import {
   confirmDemoMove,
   changeTheme,
   createDemoState,
+  dealOf,
   INVALID_CODE_MESSAGE,
   lineCards,
   listThemes,
@@ -18,7 +19,9 @@ import {
   referenceLabels,
   resolveOwnItem,
   setCardsPerParticipant,
+  setTeacherPlays,
   setDemoStatus,
+  type Deal,
   type DemoStatus,
 } from "./domain";
 
@@ -67,8 +70,8 @@ export function attachDemoServer(
 ) {
   const catalog = prepareCatalog(activitiesDir, theme);
   const projectionKey = randomBytes(24).toString("hex");
-  const newState = (selected: Theme = catalog.initial, cards = 1) => {
-    const result = createDemoState(selected, Math.random, cards);
+  const newState = (selected: Theme = catalog.initial, deal?: Deal) => {
+    const result = createDemoState(selected, Math.random, deal);
     if (publicMode) result.code = randomBytes(4).toString("hex").toUpperCase();
     return result;
   };
@@ -109,6 +112,7 @@ export function attachDemoServer(
           ? referenceLabels(state)
           : undefined,
       cardsPerParticipant: state.cardsPerParticipant,
+      teacherPlays: state.teacherPlays,
       ownItemIds: own,
       // só os próprios cartões: o aluno vê quais já pôs na linha, sem ver os votos alheios
       ownPlacedIds: own?.filter((id) => state.votes[id] !== undefined),
@@ -258,10 +262,12 @@ export function attachDemoServer(
             state,
             findTheme(catalog.themes, String(message.themeId)),
           );
+        } else if (message.type === "teacherPlays") {
+          state = setTeacherPlays(state, message.value as boolean);
         } else if (message.type === "cardsPerParticipant") {
           state = setCardsPerParticipant(state, Number(message.value));
         } else if (message.type === "reset") {
-          state = newState(state.theme, state.cardsPerParticipant);
+          state = newState(state.theme, dealOf(state));
           for (const connected of clients.values())
             if (connected.role === "student" && connected.token)
               assignStudent(state, connected.token);

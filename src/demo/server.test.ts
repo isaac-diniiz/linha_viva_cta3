@@ -15,6 +15,7 @@ type Message = {
     status: string;
     version: number;
     cardsPerParticipant: number;
+    teacherPlays: boolean;
     ownItemIds?: string[];
     ownPlacedIds?: string[];
   };
@@ -113,5 +114,30 @@ describe("servidor da demonstração", () => {
     await expect
       .poll(() => latest(student.received)?.ownPlacedIds)
       .toEqual([second]);
+  });
+
+  it("professor deixa de participar com cartões, a escolha resiste ao reinício e aluno não a altera", async () => {
+    const { code, port } = await start();
+    const teacher = await connect(port, { role: "teacher" });
+    const latest = (received: Message[]) =>
+      [...received].reverse().find((message) => message.type === "snapshot")
+        ?.state;
+    teacher.socket.send(JSON.stringify({ type: "teacherPlays", value: false }));
+    await expect.poll(() => latest(teacher.received)?.teacherPlays).toBe(false);
+    expect(latest(teacher.received)?.ownItemIds).toEqual([]);
+    teacher.socket.send(JSON.stringify({ type: "reset" }));
+    await expect.poll(() => latest(teacher.received)?.version).toBe(0);
+    expect(latest(teacher.received)?.teacherPlays).toBe(false);
+
+    const student = await connect(port, {
+      role: "student",
+      code,
+      token: "aluno-intruso",
+    });
+    student.socket.send(JSON.stringify({ type: "teacherPlays", value: true }));
+    await expect
+      .poll(() => student.received.some((message) => message.type === "error"))
+      .toBe(true);
+    expect(latest(teacher.received)?.teacherPlays).toBe(false);
   });
 });
