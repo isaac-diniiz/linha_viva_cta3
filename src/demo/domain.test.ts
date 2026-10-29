@@ -13,6 +13,7 @@ import {
   referenceLabels,
   setCardsPerParticipant,
   setDemoStatus,
+  setTeacherPlays,
   type DemoState,
 } from "./domain";
 import { findTheme, loadActivities } from "./catalog";
@@ -192,6 +193,58 @@ describe("demonstração na rede local", () => {
     expect(state.confirmedPositions).toEqual({
       evaporacao: 0.9,
       condensacao: 0.3,
+    });
+  });
+
+  describe("professor com ou sem cartões", () => {
+    it("começa com o professor participando com cartões", () => {
+      const state = createDemoState(water);
+      expect(state.teacherPlays).toBe(true);
+      expect(state.teacherItemIds).toHaveLength(1);
+    });
+
+    it("sem cartões do professor, os alunos começam do início do baralho, mesmo com reserva", () => {
+      const history = theme("historia");
+      expect(history.teacherCardReserved).toBe(true);
+      const state = setTeacherPlays(createDemoState(history), false);
+      expect(state.teacherItemIds).toEqual([]);
+      expect(ownedItems(state, "", true)).toEqual([]);
+      const [first] = assignStudent(state, "a");
+      expect(state.items).toHaveLength(1);
+      expect(state.items.find((item) => item.id === first)?.templateId).toBe(
+        state.deck[0],
+      );
+    });
+
+    it("só muda antes de iniciar, mantendo código, alunos e quantidade de cartões", () => {
+      const state = setCardsPerParticipant(createDemoState(water), 2);
+      state.code = "TURMA123";
+      assignStudent(state, "a");
+      const next = setTeacherPlays(state, false);
+      expect(next.code).toBe("TURMA123");
+      expect(next.cardsPerParticipant).toBe(2);
+      expect(next.members.a).toHaveLength(2);
+      expect(next.teacherPlays).toBe(false);
+      setDemoStatus(next, "active");
+      expect(() => setTeacherPlays(next, true)).toThrow(/antes de iniciar/);
+    });
+
+    it("preserva a escolha ao trocar de tema ou de quantidade", () => {
+      const off = setTeacherPlays(createDemoState(water), false);
+      const otherTheme = changeTheme(off, theme("metamorfose"));
+      expect(otherTheme.teacherPlays).toBe(false);
+      expect(otherTheme.teacherItemIds).toEqual([]);
+      const more = setCardsPerParticipant(off, 3);
+      expect(more.teacherPlays).toBe(false);
+      expect(more.teacherItemIds).toEqual([]);
+    });
+
+    it("professor sem cartões não confirma posição", () => {
+      const state = setTeacherPlays(createDemoState(water), false);
+      setDemoStatus(state, "active");
+      expect(() =>
+        confirmDemoMove(state, "", 0.5, state.version, { asTeacher: true }),
+      ).toThrow(/não recebeu/);
     });
   });
 

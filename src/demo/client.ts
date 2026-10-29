@@ -34,6 +34,8 @@ export type DemoSnapshot = {
   reference?: string[];
   /** Quantos cartões cada participante recebe nesta sessão. */
   cardsPerParticipant: number;
+  /** O professor recebe cartões ou só conduz a atividade. */
+  teacherPlays: boolean;
   /** Cartões de quem recebeu este estado (professor ou aluno). */
   ownItemIds?: string[];
   /** Cartões próprios que já têm posição confirmada na linha. */

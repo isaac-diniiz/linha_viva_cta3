@@ -24,6 +24,7 @@ function snapshot(own: { id: string; label: string }[], placed: string[] = []) {
     previews: {},
     memberCount: 1,
     cardsPerParticipant: own.length,
+    teacherPlays: true,
     ownItemIds: own.map((item) => item.id),
     ownPlacedIds: placed,
   } satisfies DemoSnapshot;
