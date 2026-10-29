@@ -28,11 +28,14 @@ test("QR da projeção acompanha o novo código após reiniciar", async ({
   const oldUrl = await qr.getAttribute("data-join-url");
   await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
   await expect(qr).not.toHaveAttribute("data-join-url", oldUrl ?? "");
-  await expect(qr).toHaveAttribute(
-    "data-join-url",
-    new URL((await studentLink.getAttribute("href")) ?? "", projection.url())
-      .href,
-  );
+  // painel e projeção recebem o código novo quase juntos: compara até coincidirem
+  await expect
+    .poll(async () => {
+      const href = await studentLink.getAttribute("href");
+      const joinUrl = await qr.getAttribute("data-join-url");
+      return href !== null && joinUrl === new URL(href, projection.url()).href;
+    })
+    .toBe(true);
   await projection.close();
   await teacher.close();
 });
