@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { teacherAccounts } from "./accounts";
+import { createAuthHandler } from "./auth";
 import { demoLinks } from "./links";
 import { attachDemoServer } from "./server";
 
@@ -13,8 +15,15 @@ const mime: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
 };
+const accounts = teacherAccounts(process.env);
+const handleAuth = createAuthHandler({
+  directory: accounts.directory,
+  secret: accounts.secret,
+  invite: accounts.invite,
+});
 const server = createServer(async (request, response) => {
   try {
+    if (await handleAuth(request, response)) return;
     const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
     const target = resolve(root, `.${decodeURIComponent(pathname)}`);
     if (target !== root && !target.startsWith(root + sep)) {
@@ -38,17 +47,15 @@ const server = createServer(async (request, response) => {
   }
 });
 
-const { teacherKey, code } = attachDemoServer(server, {
+const { code } = attachDemoServer(server, {
   publicMode: true,
-  teacherKey: process.env.DEMO_TEACHER_KEY,
+  sessionSecret: accounts.secret,
 });
 const port = Number(process.env.PORT ?? 4173);
 server.listen(port, "0.0.0.0", () => {
-  const links = demoLinks({ env: process.env, port, teacherKey, code });
+  const links = demoLinks({ env: process.env, port, code });
   console.log(`Professor: ${links.teacher}`);
   console.log(`Alunos: ${links.students}`);
-  if (process.env.RENDER_EXTERNAL_URL && !process.env.DEMO_TEACHER_KEY)
-    console.warn(
-      "DEMO_TEACHER_KEY não definida: o link do professor muda a cada reinício.",
-    );
+  console.log(`Contas de professor: ${accounts.source}`);
+  for (const warning of accounts.warnings) console.warn(warning);
 });

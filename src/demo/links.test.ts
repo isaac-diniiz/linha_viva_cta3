@@ -7,11 +7,10 @@ describe("links impressos pelo servidor da demonstração", () => {
       demoLinks({
         env: { DEMO_PUBLIC_URL: "https://linha-viva.exemplo.org" },
         port: 4173,
-        teacherKey: "abc123",
         code: "1A2B3C4D",
       }),
     ).toEqual({
-      teacher: "https://linha-viva.exemplo.org/demo/professor?key=abc123",
+      teacher: "https://linha-viva.exemplo.org/demo/professor",
       students: "https://linha-viva.exemplo.org/demo/aluno/1A2B3C4D",
     });
   });
@@ -20,7 +19,6 @@ describe("links impressos pelo servidor da demonstração", () => {
     const links = demoLinks({
       env: { RENDER_EXTERNAL_URL: "https://linha-viva.onrender.com" },
       port: 10000,
-      teacherKey: "abc",
       code: "CODE",
     });
     expect(links.students).toBe(
@@ -29,19 +27,17 @@ describe("links impressos pelo servidor da demonstração", () => {
   });
 
   it("cai para o computador local sem endereço público", () => {
-    expect(
-      demoLinks({ env: {}, port: 4173, teacherKey: "k", code: "C" }).teacher,
-    ).toBe("http://localhost:4173/demo/professor?key=k");
+    expect(demoLinks({ env: {}, port: 4173, code: "C" }).teacher).toBe(
+      "http://localhost:4173/demo/professor",
+    );
   });
 
-  it("codifica a chave, para + e / não se perderem no navegador", () => {
+  it("não põe chave no link do professor: o acesso é pelo login", () => {
     const { teacher } = demoLinks({
       env: { DEMO_PUBLIC_URL: "https://x.org/" },
       port: 1,
-      teacherKey: "a+b/c=",
       code: "C",
     });
-    expect(teacher).toBe("https://x.org/demo/professor?key=a%2Bb%2Fc%3D");
-    expect(new URL(teacher).searchParams.get("key")).toBe("a+b/c=");
+    expect(new URL(teacher).search).toBe("");
   });
 });

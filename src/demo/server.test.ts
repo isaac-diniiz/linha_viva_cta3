@@ -4,7 +4,10 @@ import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
+import { signSession } from "./auth";
 import { attachDemoServer } from "./server";
+
+const SECRET = "segredo-de-teste-com-tamanho-suficiente";
 
 type Message = {
   type: string;
@@ -30,18 +33,26 @@ describe("servidor da demonstração", () => {
     server = null;
   });
 
-  async function start() {
+  async function start(publicMode = false) {
     server = createServer();
     const { code } = attachDemoServer(server, {
       activitiesDir: resolve("atividades"),
       theme: "ciclo-da-agua",
+      publicMode,
+      sessionSecret: SECRET,
     });
     await new Promise<void>((done) => server!.listen(0, "127.0.0.1", done));
     return { code, port: (server.address() as AddressInfo).port };
   }
 
-  async function connect(port: number, join: Record<string, unknown>) {
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/demo-ws`);
+  async function connect(
+    port: number,
+    join: Record<string, unknown>,
+    cookie?: string,
+  ) {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/demo-ws`, {
+      headers: cookie ? { cookie } : {},
+    });
     sockets.push(socket);
     const received: Message[] = [];
     socket.on("message", (data) => received.push(JSON.parse(String(data))));
@@ -139,5 +150,32 @@ describe("servidor da demonstração", () => {
       .poll(() => student.received.some((message) => message.type === "error"))
       .toBe(true);
     expect(latest(teacher.received)?.teacherPlays).toBe(false);
+  });
+
+  it("no modo público, o professor só entra com sessão válida, sem chave no link", async () => {
+    const { port } = await start(true);
+    const anonymous = await connect(port, { role: "teacher" });
+    expect(anonymous.received.at(-1)).toMatchObject({
+      type: "error",
+      message: "Entre como professor.",
+    });
+    const forged = signSession(
+      { email: "intruso@x.br" },
+      "outro-segredo-qualquer-bem-longo",
+      Date.now(),
+    );
+    const intruder = await connect(
+      port,
+      { role: "teacher" },
+      `lv_professor=${forged}`,
+    );
+    expect(intruder.received.at(-1)?.type).toBe("error");
+    const token = signSession({ email: "ana@escola.br" }, SECRET, Date.now());
+    const teacher = await connect(
+      port,
+      { role: "teacher" },
+      `lv_professor=${token}`,
+    );
+    expect(teacher.received.at(-1)?.type).toBe("snapshot");
   });
 });

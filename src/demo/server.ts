@@ -1,9 +1,11 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { randomBytes } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 import { resolve } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { acceptPreview, expirePreviews, type Preview } from "../domain/preview";
 import type { Theme } from "./activity";
+import { teacherFromCookie } from "./auth";
 import { findTheme, loadActivities } from "./catalog";
 import {
   assignStudent,
@@ -58,12 +60,13 @@ export function attachDemoServer(
   httpServer: NonNullable<ViteDevServer["httpServer"]>,
   {
     publicMode = false,
-    teacherKey = randomBytes(24).toString("hex"),
+    sessionSecret,
     theme = process.env.LINHA_VIVA_TEMA,
     activitiesDir = process.env.LINHA_VIVA_ATIVIDADES ?? resolve("atividades"),
   }: {
     publicMode?: boolean;
-    teacherKey?: string;
+    /** Segredo das sessões de professor; no modo público, sem ele ninguém conduz. */
+    sessionSecret?: string;
     theme?: string;
     activitiesDir?: string;
   } = {},
@@ -145,11 +148,15 @@ export function attachDemoServer(
     if (new URL(request.url ?? "/", "http://localhost").pathname !== "/demo-ws")
       return;
     wss.handleUpgrade(request, socket, head, (connection) =>
-      wss.emit("connection", connection),
+      wss.emit("connection", connection, request),
     );
   });
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", (socket, request: IncomingMessage) => {
+    // o cookie de sessão chega no pedido de abertura do WebSocket
+    const teacher = sessionSecret
+      ? teacherFromCookie(request.headers.cookie, sessionSecret, Date.now())
+      : null;
     socket.on("message", (raw) => {
       try {
         const message = JSON.parse(raw.toString()) as Record<string, unknown>;
@@ -160,8 +167,8 @@ export function attachDemoServer(
           if (role !== "teacher" && role !== "projection" && role !== "student")
             throw new Error("Papel inválido.");
           const client: Client = { role };
-          if (publicMode && role === "teacher" && message.key !== teacherKey)
-            throw new Error("Chave do professor inválida.");
+          if (publicMode && role === "teacher" && !teacher)
+            throw new Error("Entre como professor.");
           if (
             publicMode &&
             role === "projection" &&
@@ -306,7 +313,7 @@ export function attachDemoServer(
     for (const socket of clients.keys()) socket.terminate();
     wss.close();
   });
-  return { teacherKey, projectionKey, code: state.code };
+  return { projectionKey, code: state.code };
 }
 
 export function localDemoPlugin(): Plugin {
@@ -315,6 +322,11 @@ export function localDemoPlugin(): Plugin {
     apply: "serve",
     configureServer(vite) {
       if (vite.httpServer) attachDemoServer(vite.httpServer);
+      // modo local sem login: o painel do professor abre direto
+      vite.middlewares.use("/demo/api/eu", (_request, response) => {
+        response.setHeader("content-type", "application/json; charset=utf-8");
+        response.end(JSON.stringify({ email: null }));
+      });
     },
   };
 }
