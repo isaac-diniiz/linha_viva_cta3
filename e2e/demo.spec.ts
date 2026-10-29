@@ -179,3 +179,65 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
   );
   await teacher.close();
 });
+
+test("no celular em pé, caixas confirmadas próximas não se cobrem", async ({
+  browser,
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "Executar no projeto mobile.");
+  const teacher = await browser.newPage();
+  await teacher.goto("/demo/professor");
+  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  const perParticipant = teacher.getByLabel("Cartões por participante");
+  try {
+    await perParticipant.selectOption("3");
+    await expect(perParticipant).toHaveValue("3");
+    await page.goto("/demo/aluno/DEMO1234");
+    await expect(page.locator(".drag-card")).toHaveCount(3);
+    await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
+    const chooser = page.getByLabel("Cartão para posicionar");
+    const labels = await chooser.locator("option").allTextContents();
+    for (const [index, label] of labels.entries()) {
+      await chooser.selectOption({ label });
+      await page
+        .getByRole("slider", { name: /Outra forma de posicionar/ })
+        .fill(String(45 + index * 5));
+      await page
+        .getByRole("button", { name: "Confirmar posição escolhida" })
+        .click();
+      await expect(page.getByText("✓ na linha")).toHaveCount(index + 1);
+    }
+    const cards = page.locator(".confirmed-card");
+    await expect(cards).toHaveCount(3);
+    // espera as faixas se acomodarem antes de medir
+    await expect
+      .poll(async () => {
+        const boxes = await Promise.all(
+          (await cards.all()).map((card) => card.boundingBox()),
+        );
+        let overlaps = 0;
+        for (const [i, a] of boxes.entries())
+          for (const b of boxes.slice(i + 1))
+            if (
+              a &&
+              b &&
+              a.x < b.x + b.width &&
+              b.x < a.x + a.width &&
+              a.y < b.y + b.height &&
+              b.y < a.y + a.height
+            )
+              overlaps++;
+        return overlaps;
+      })
+      .toBe(0);
+  } finally {
+    // devolve um cartão por participante: reiniciar preserva a quantidade
+    await reset.click();
+    await perParticipant.selectOption("1");
+    await expect(perParticipant).toHaveValue("1");
+    await teacher.close();
+  }
+});
