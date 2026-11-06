@@ -16,7 +16,17 @@ import {
   withLocalPreviews,
 } from "../shared";
 
-export function Teacher() {
+/** Resposta do servidor quando a sessão do professor falta ou venceu. */
+const SESSION_LOST = "Entre como professor.";
+
+export function Teacher({
+  account = null,
+  onSignOut,
+}: {
+  /** E-mail do professor conectado; null no modo local, sem login. */
+  account?: string | null;
+  onSignOut?: () => void;
+} = {}) {
   const { state, connected, error, send, confirm, preview } =
     useLocalDemo("teacher");
   const [message, setMessage] = useState("");
@@ -38,7 +48,22 @@ export function Teacher() {
   return (
     <main className="app-shell demo-shell">
       <Header role="PROFESSOR" />
+      {account && (
+        <div className="account-bar">
+          <span>Conectado como {account}</span>
+          {onSignOut && (
+            <button type="button" className="button subtle" onClick={onSignOut}>
+              Sair
+            </button>
+          )}
+        </div>
+      )}
       <Connection connected={connected} error={error} />
+      {error === SESSION_LOST && onSignOut && (
+        <button type="button" className="button primary" onClick={onSignOut}>
+          Entrar de novo
+        </button>
+      )}
       <section className="demo-heading">
         <div>
           <div className="eyebrow">

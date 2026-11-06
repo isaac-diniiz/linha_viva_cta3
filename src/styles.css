@@ -1892,3 +1892,22 @@ body {
   height: 22px;
   accent-color: #188c85;
 }
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #12516b;
+}
+.teacher-login form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.teacher-login label {
+  font-weight: 800;
+  color: #12516b;
+}
