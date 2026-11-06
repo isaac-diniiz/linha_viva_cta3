@@ -1,10 +1,25 @@
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+// sem contas configuradas, cria uma conta temporária só para esta demonstração
+const temporaryAccount =
+  !process.env.SUPABASE_URL && !process.env.PROFESSOR_TESTE
+    ? {
+        email: "professor@demo.local",
+        password: randomBytes(9).toString("base64url"),
+      }
+    : null;
 const server = spawn(process.execPath, ["dist-server/standalone.js"], {
   stdio: ["ignore", "pipe", "inherit"],
-  env: { ...process.env, PORT: "4173" },
+  env: {
+    ...process.env,
+    PORT: "4173",
+    ...(temporaryAccount && {
+      PROFESSOR_TESTE: `${temporaryAccount.email}:${temporaryAccount.password}`,
+    }),
+  },
 });
 let teacherPath = "";
 let studentPath = "";
@@ -24,7 +39,11 @@ function stop(code = 0) {
 
 function showLinks() {
   if (!teacherPath || !studentPath || !publicBase) return;
-  console.log(`\nProfessor (não compartilhe): ${publicBase}${teacherPath}`);
+  console.log(`\nProfessor: ${publicBase}${teacherPath}`);
+  if (temporaryAccount)
+    console.log(
+      `  Entre com ${temporaryAccount.email} e a senha ${temporaryAccount.password} (não compartilhe; vale até Ctrl+C).`,
+    );
   console.log(`Alunos (compartilhe): ${publicBase}${studentPath}`);
   console.log(
     "Abra a projeção pelo painel do professor. Ctrl+C encerra a demo.\n",
@@ -34,7 +53,7 @@ function showLinks() {
 server.stdout.on("data", (chunk) => {
   serverOutput += String(chunk);
   const teacher = serverOutput.match(
-    /Professor: http:\/\/localhost:4173(\/demo\/professor\?key=[^\s]+)/,
+    /Professor: http:\/\/localhost:4173(\/demo\/professor)/,
   );
   const student = serverOutput.match(
     /Alunos: http:\/\/localhost:4173(\/demo\/aluno\/[A-Z0-9]+)/,

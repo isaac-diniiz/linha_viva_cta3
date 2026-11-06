@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openTeacher } from "./teacher-login";
 
 test.skip(
   !process.env.DEMO_MODE && !process.env.DEMO_PUBLIC_URL,
@@ -20,8 +21,9 @@ test("duas prévias remotas avançam em vários frames entre mensagens", async (
   browser,
 }) => {
   const teacher = await browser.newPage();
-  const key = process.env.DEMO_TEACHER_KEY;
-  await teacher.goto(`/demo/professor${key ? `?key=${key}` : ""}`);
+  // contra o servidor público é preciso entrar; no modo local o painel abre direto
+  if (process.env.DEMO_PUBLIC_URL) await openTeacher(teacher);
+  else await teacher.goto("/demo/professor");
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const oldStudentUrl = await share.getAttribute("href");
