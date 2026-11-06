@@ -11,8 +11,16 @@ services:
     autoDeploy: true
     healthCheckPath: /
     envVars:
-      # chave fixa do link do professor; definida no painel, nunca no repositório
-      - key: DEMO_TEACHER_KEY
+      # contas de professor no Supabase; valores definidos no painel, nunca no repositório
+      - key: SUPABASE_URL
         sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      # código que a equipe passa a quem pode criar conta de professor
+      - key: CONVITE_PROFESSOR
+        sync: false
+      # assina os logins; gerado pelo Render e mantido entre publicações
+      - key: SESSAO_SEGREDO
+        generateValue: true
       - key: LINHA_VIVA_TEMA
         value: ciclo-da-agua

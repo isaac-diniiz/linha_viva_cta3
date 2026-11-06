@@ -28,7 +28,7 @@ Se o celular não abrir a página, confira se está no mesmo Wi-Fi, use o IPv4 d
 Usa o computador como servidor e um [Cloudflare Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/) para criar um endereço HTTPS temporário. Serve para testes e como plano B se a versão hospedada falhar; o computador precisa ficar ligado com o terminal aberto durante toda a sessão.
 
 1. Baixe o [executável Windows de 64 bits do cloudflared](https://developers.cloudflare.com/tunnel/downloads/) para `.tools/cloudflared.exe` dentro deste projeto, ou instale `cloudflared` no `PATH`.
-2. Execute `npm run demo:internet`. O terminal imprime um **link do professor**, com chave privada, e um **link dos alunos**. Abra o link do professor e clique em **Abrir projeção**. Enquanto a atividade aguarda, a projeção mostra um QR Code para o link dos alunos e o código da turma.
+2. Execute `npm run demo:internet`. O terminal imprime o **link do professor**, com um e-mail e uma senha temporários para entrar (válidos até `Ctrl+C`), e o **link dos alunos**. Abra o link do professor, entre e clique em **Abrir projeção**. Enquanto a atividade aguarda, a projeção mostra um QR Code para o link dos alunos e o código da turma.
 3. Os alunos apontam a câmera do celular para o QR Code ou abrem o link dos alunos, em qualquer rede com internet. O professor clica em **Iniciar atividade**; o QR Code sai da projeção para dar espaço à linha.
 4. `Ctrl+C` no terminal desliga o link e apaga a sessão. Ao reiniciar, o código e os links mudam.
 
@@ -55,4 +55,4 @@ As prévias são limitadas a seis mensagens por segundo por arraste. A projeçã
 | `npm run test:db`      | Migrações e pgTAP da versão Supabase em PostgreSQL WASM, sem Docker                   |
 | `npm run test:e2e`     | Playwright desktop e celular; os percursos da demonstração exigem as variáveis abaixo |
 
-Para os percursos Playwright da demonstração: `DEMO_MODE=1` roda `e2e/demo.spec.ts` e `e2e/smooth-demo.spec.ts` com o servidor de desenvolvimento; `PUBLIC_DEMO_MODE=1` roda `e2e/public-demo.spec.ts` contra `npm run start:demo` na porta 4173 com `DEMO_TEACHER_KEY=teste-professor`. A CI executa os dois. Os comandos da versão Supabase estão em [docs/supabase.md](docs/supabase.md).
+Para os percursos Playwright da demonstração: `DEMO_MODE=1` roda `e2e/demo.spec.ts` e `e2e/smooth-demo.spec.ts` com o servidor de desenvolvimento; `PUBLIC_DEMO_MODE=1` roda `e2e/public-demo.spec.ts` contra `npm run start:demo` na porta 4173 com `PROFESSOR_TESTE="professor@teste.br:senha-de-teste"` e `CONVITE_PROFESSOR=convite-teste`, a conta e o convite que os testes usam. A CI executa os dois. Os comandos da versão Supabase estão em [docs/supabase.md](docs/supabase.md).
