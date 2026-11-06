@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openTeacher, testInvite } from "./teacher-login";
 
 test.skip(!process.env.PUBLIC_DEMO_MODE, "Executar com PUBLIC_DEMO_MODE=1.");
 
@@ -6,9 +7,7 @@ test("QR da projeção acompanha o novo código após reiniciar", async ({
   browser,
 }) => {
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   const studentLink = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(studentLink).toBeVisible();
   // a sessão é única no servidor; outro teste pode tê-la deixado iniciada
@@ -44,9 +43,7 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
   browser,
 }) => {
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   await expect(
     teacher.getByRole("button", { name: "Reiniciar demonstração" }),
   ).toBeEnabled();
@@ -170,9 +167,7 @@ test("aluno entra pela página inicial digitando o código da turma", async ({
   page,
 }) => {
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const code = (await share.getAttribute("href"))!.split("/").pop()!;
@@ -202,9 +197,7 @@ test("com poucas pessoas, cada participante recebe e posiciona vários cartões"
 }) => {
   test.skip(isMobile, "A quantidade é escolhida no painel do professor.");
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
   await expect(reset).toBeEnabled();
   await reset.click();
@@ -256,9 +249,7 @@ test("professor pode só conduzir, sem receber cartões", async ({
 }) => {
   test.skip(isMobile, "A escolha é feita no painel do professor.");
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
   await expect(reset).toBeEnabled();
   await reset.click();
@@ -295,17 +286,18 @@ test("professor pode só conduzir, sem receber cartões", async ({
   }
 });
 
-test("link sem chave não controla o professor nem lê a projeção", async ({
+test("sem login não abre o painel do professor, e a projeção exige a chave dela", async ({
   browser,
 }) => {
   const impostor = await browser.newPage();
   await impostor.goto("/demo/professor");
-  await expect(impostor.getByRole("alert")).toContainText(
-    "Chave do professor inválida",
-  );
+  await expect(
+    impostor.getByRole("heading", { name: "Entrar como professor" }),
+  ).toBeVisible();
   await expect(
     impostor.getByRole("button", { name: "Iniciar atividade" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
+  await expect(impostor.getByText(/CÓDIGO DA TURMA/)).toHaveCount(0);
   const projection = await browser.newPage();
   await projection.goto("/demo/projetor");
   await expect(projection.getByRole("alert")).toContainText(
@@ -316,6 +308,36 @@ test("link sem chave não controla o professor nem lê a projeção", async ({
   await impostor.close();
 });
 
+test("professor cria a conta com o código de convite, entra e sai", async ({
+  browser,
+  isMobile,
+}) => {
+  test.skip(isMobile, "O cadastro é feito no painel do professor.");
+  const page = await browser.newPage();
+  await page.goto("/demo/professor");
+  await page.getByRole("button", { name: "Criar conta" }).click();
+  await page.getByLabel(/^E-mail/).fill(`novo-${Date.now()}@escola.br`);
+  await page.getByLabel(/^Senha/).fill("senha-do-novo");
+  await page.getByLabel(/Código de convite/).fill("palpite-errado");
+  await page.getByRole("button", { name: "Criar conta e entrar" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Código de convite incorreto",
+  );
+  await page.getByLabel(/Código de convite/).fill(testInvite);
+  await page.getByRole("button", { name: "Criar conta e entrar" }).click();
+  await expect(page.getByText(/Conectado como novo-/)).toBeVisible();
+  await expect(page.getByText(/CÓDIGO DA TURMA/)).toBeVisible();
+  await page.getByRole("button", { name: "Sair" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Entrar como professor" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Entrar como professor" }),
+  ).toBeVisible();
+  await page.close();
+});
+
 test("celular em navegador independente confirma pela alternativa ao arraste", async ({
   browser,
   page,
@@ -323,9 +345,7 @@ test("celular em navegador independente confirma pela alternativa ao arraste", a
 }) => {
   test.skip(!isMobile, "Executar no projeto mobile.");
   const teacher = await browser.newPage();
-  await teacher.goto(
-    `/demo/professor?key=${process.env.DEMO_TEACHER_KEY ?? "teste-professor"}`,
-  );
+  await openTeacher(teacher);
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const oldStudentUrl = await share.getAttribute("href");
