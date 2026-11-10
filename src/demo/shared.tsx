@@ -122,7 +122,7 @@ export function Header({ role }: { role: string }) {
   return (
     <header className="app-header">
       <a className="logo" href="/">
-        <span className="logo-mark">L</span>
+        <img className="brand-mark" src="/linha-viva-marca.svg" alt="" />
         <span>Linha Viva</span>
       </a>
       <span className="header-tag">DEMONSTRAÇÃO · {role}</span>

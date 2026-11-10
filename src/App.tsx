@@ -67,7 +67,7 @@ function HomePage() {
           )}
         </div>
         <div className="home-logo-panel">
-          <img src="/linha-viva-logo.png" alt="Logo da Linha Viva" />
+          <img src="/linha-viva-marca.svg" alt="Marca da Linha Viva" />
         </div>
       </section>
       <footer className="home-footer">

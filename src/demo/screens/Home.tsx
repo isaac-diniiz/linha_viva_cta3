@@ -31,8 +31,8 @@ export function Home() {
         </div>
         <img
           className="home-logo-image"
-          src="/linha-viva-logo.png"
-          alt="Logo da Linha Viva"
+          src="/linha-viva-marca.svg"
+          alt="Marca da Linha Viva"
         />
       </section>
     </main>
