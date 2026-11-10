@@ -47,7 +47,7 @@ Não começar por biblioteca extensa de atividades, contas de estudantes, chat, 
 
 ## Acessibilidade e uso em sala
 
-- Direção visual validada: referência à web do início dos anos 2000 e ao Frutiger Aero, com céu azul, verde água, superfícies translúcidas, brilho e controles com relevo. Manter contraste, foco visível e leitura à distância; os elementos decorativos não devem atrapalhar a linha coletiva nem as prévias em movimento.
+- Direção visual (decisão de 09/nov/2026, substitui a referência anos 2000/Frutiger Aero, que lembrava demais o MSN): moderna e limpa, com fundo claro liso, superfícies brancas, sombras sutis, sem degradês nem brilhos. Azul-petróleo (`--lv-primary`) para ações e cartões do aluno; laranja (`--lv-accent`) só para o que está em movimento (prévias e marcas de voto); verde, âmbar e vermelho só para estados. As cores, raios e sombras ficam em variáveis `--lv-*` no início da camada visual de `src/styles.css`. A marca é `public/linha-viva-marca.svg` (linha com um cartão sendo posicionado), também usada como ícone da aba. Manter contraste, foco visível e leitura à distância; os elementos decorativos não devem atrapalhar a linha coletiva nem as prévias em movimento.
 - Não depender apenas de cor, animação ou arraste para transmitir estado ou permitir ação. Oferecer rótulos, foco visível, controles grandes e feedback textual.
 - Projetar para contraste adequado, leitura à distância, diferentes tamanhos de tela e redução de movimento.
 - Evitar exposição pública de dificuldades individuais. O professor deve poder retomar e corrigir a atividade sem constranger um estudante.
