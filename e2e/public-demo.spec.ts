@@ -318,12 +318,17 @@ test("professor cria a conta com o código de convite, entra e sai", async ({
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel(/^E-mail/).fill(`novo-${Date.now()}@escola.br`);
   await page.getByLabel(/^Senha/).fill("senha-do-novo");
-  await page.getByLabel(/Código de convite/).fill("palpite-errado");
-  await page.getByRole("button", { name: "Criar conta e entrar" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Código de convite incorreto",
-  );
-  await page.getByLabel(/Código de convite/).fill(testInvite);
+  if (testInvite) {
+    await page.getByLabel(/Código de convite/).fill("palpite-errado");
+    await page.getByRole("button", { name: "Criar conta e entrar" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "Código de convite incorreto",
+    );
+    await page.getByLabel(/Código de convite/).fill(testInvite);
+  } else {
+    // sem CONVITE_PROFESSOR o cadastro é aberto e não pede código
+    await expect(page.getByLabel(/Código de convite/)).toHaveCount(0);
+  }
   await page.getByRole("button", { name: "Criar conta e entrar" }).click();
   await expect(page.getByText(/Conectado como novo-/)).toBeVisible();
   await expect(page.getByText(/CÓDIGO DA TURMA/)).toBeVisible();

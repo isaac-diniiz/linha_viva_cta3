@@ -44,6 +44,32 @@ describe("acesso ao painel do professor", () => {
     expect(useLocalDemo).not.toHaveBeenCalled();
   });
 
+  it("se o servidor não exige convite, o cadastro não pede o código", async () => {
+    fetchMock.mockReturnValue(
+      respond(401, {
+        erro: "Entre como professor.",
+        conviteObrigatorio: false,
+      }),
+    );
+    render(<TeacherGate />);
+    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+    expect(screen.queryByLabelText(/Código de convite/)).toBeNull();
+  });
+
+  it("se o servidor exige convite, ou não informa nada, o cadastro pede o código", async () => {
+    fetchMock.mockReturnValue(
+      respond(401, { erro: "Entre como professor.", conviteObrigatorio: true }),
+    );
+    const first = render(<TeacherGate />);
+    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+    expect(screen.getByLabelText(/Código de convite/)).toBeInTheDocument();
+    first.unmount();
+    fetchMock.mockReturnValue(respond(401, { erro: "Entre como professor." }));
+    render(<TeacherGate />);
+    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+    expect(screen.getByLabelText(/Código de convite/)).toBeInTheDocument();
+  });
+
   it("no modo local, sem login, abre o painel direto", async () => {
     fetchMock.mockReturnValue(respond(200, { email: null }));
     render(<TeacherGate />);
@@ -54,7 +80,8 @@ describe("acesso ao painel do professor", () => {
   it("com sessão, mostra quem está conectado e sai de volta para a entrada", async () => {
     fetchMock
       .mockReturnValueOnce(respond(200, { email: "ana@escola.br" }))
-      .mockReturnValueOnce(respond(204));
+      .mockReturnValueOnce(respond(204))
+      .mockReturnValueOnce(respond(401, { erro: "Entre como professor." }));
     render(<TeacherGate />);
     expect(
       await screen.findByText(/Conectado como ana@escola\.br/),
@@ -64,9 +91,36 @@ describe("acesso ao painel do professor", () => {
       await screen.findByRole("heading", { name: "Entrar como professor" }),
     ).toBeInTheDocument();
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith("/demo/api/sair", {
+      expect(fetchMock).toHaveBeenCalledWith("/demo/api/sair", {
         method: "POST",
       }),
     );
+  });
+
+  it("depois de sair, o cadastro continua sem pedir convite se o servidor não exige", async () => {
+    fetchMock
+      .mockReturnValueOnce(respond(200, { email: "ana@escola.br" }))
+      .mockReturnValueOnce(respond(204))
+      .mockReturnValueOnce(
+        respond(401, {
+          erro: "Entre como professor.",
+          conviteObrigatorio: false,
+        }),
+      );
+    render(<TeacherGate />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sair" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+    expect(screen.queryByLabelText(/Código de convite/)).toBeNull();
+  });
+
+  it("se o aviso de sair falhar, volta para a entrada pedindo o código por precaução", async () => {
+    fetchMock
+      .mockReturnValueOnce(respond(200, { email: "ana@escola.br" }))
+      .mockReturnValueOnce(respond(204))
+      .mockReturnValueOnce(respond(200, { email: "ana@escola.br" }));
+    render(<TeacherGate />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sair" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+    expect(screen.getByLabelText(/Código de convite/)).toBeInTheDocument();
   });
 });

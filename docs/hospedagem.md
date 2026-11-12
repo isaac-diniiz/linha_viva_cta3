@@ -24,7 +24,7 @@ A versão usada na escola é o servidor Node da demonstração, hospedado no [Re
 1. Crie uma conta no Render e conecte a conta do GitHub que tem acesso ao repositório.
 2. No painel, escolha **New → Blueprint**, selecione o repositório e confirme o arquivo `render.yaml`. Preencha quando o Render pedir:
    - `SUPABASE_URL` e `SUPABASE_SECRET_KEY`: os valores do Supabase;
-   - `CONVITE_PROFESSOR`: o código de convite que a equipe vai passar aos professores. Prefira uma frase longa, difícil de adivinhar.
+   - `CONVITE_PROFESSOR` (opcional): o código de convite que a equipe vai passar aos professores. Prefira uma frase longa, difícil de adivinhar. **Em branco, qualquer pessoa com o link cria conta de professor** e passa a usar o seu Supabase; deixe assim só se o endereço não for divulgado.
 
    `SESSAO_SEGREDO` é gerado pelo próprio Render.
 
@@ -37,17 +37,17 @@ A versão usada na escola é o servidor Node da demonstração, hospedado no [Re
    Linhas criadas: supabase
    ```
 
-   Se aparecer outra linha de aviso (`Sem contas de professor`, `CONVITE_PROFESSOR não definido`, `SESSAO_SEGREDO ausente` ou `Sem SUPABASE_URL e SUPABASE_SECRET_KEY, as linhas criadas ficam só em arquivos`), falta a variável indicada em **Environment**. Se, ao criar uma linha, o painel disser que a tabela `demo_lines` não existe, falta o passo 4 do Supabase.
+   Se aparecer outra linha de aviso (`Sem contas de professor`, `CONVITE_PROFESSOR não definido` (cadastro aberto a qualquer pessoa; só preocupa se você queria exigir convite), `SESSAO_SEGREDO ausente` ou `Sem SUPABASE_URL e SUPABASE_SECRET_KEY, as linhas criadas ficam só em arquivos`), falta a variável indicada em **Environment**. Se, ao criar uma linha, o painel disser que a tabela `demo_lines` não existe, falta o passo 4 do Supabase.
 
 Um serviço criado antes desta versão ainda usa `DEMO_TEACHER_KEY`: adicione as variáveis acima em **Environment** e apague `DEMO_TEACHER_KEY`, que não é mais usada.
 
 ### 3. Contas de professor
 
-Cada professor abre `https://linha-viva.onrender.com/demo/professor`, clica em **Criar conta** e informa e-mail, uma senha de pelo menos 8 caracteres e o **código de convite**. A conta já entra no painel. Depois, basta **Entrar** com e-mail e senha; o acesso vale por 8 horas, e **Sair** encerra antes.
+Cada professor abre `https://linha-viva.onrender.com/demo/professor`, clica em **Criar conta** e informa e-mail, uma senha de pelo menos 8 caracteres e, se o servidor tiver `CONVITE_PROFESSOR`, o **código de convite**. A conta já entra no painel. Depois, basta **Entrar** com e-mail e senha; o acesso vale por 8 horas, e **Sair** encerra antes.
 
 - **Esqueceu a senha:** no Supabase, em **Authentication → Users**, encontre o e-mail e defina uma nova senha (ou apague o usuário para ele criar a conta de novo). Não há recuperação por e-mail enquanto o projeto não tiver um provedor de e-mail próprio.
 - **Tirar o acesso de alguém:** apague o usuário no Supabase. Login aberto em algum navegador continua valendo até completar 8 horas.
-- **Trocar o código de convite:** altere `CONVITE_PROFESSOR` no Render. Contas já criadas continuam valendo.
+- **Trocar o código de convite:** altere `CONVITE_PROFESSOR` no Render. Contas já criadas continuam valendo. Para voltar a exigir convite depois de um período aberto, defina o código e revise os usuários em **Authentication → Users**; para abrir o cadastro, apague a variável.
 - **Senhas erradas:** depois de 5 tentativas, o login daquela rede e daquele e-mail fica bloqueado por 15 minutos.
 - Ainda existe **uma única turma por servidor**: se dois professores entrarem ao mesmo tempo, os dois controlam a mesma sessão.
 
@@ -73,7 +73,7 @@ Deixe a aba do professor ou da projeção aberta durante toda a aula; ela manté
 `npm run build:demo` e depois `npm run start:demo` rodam o mesmo servidor que o Render executa. Sem Supabase, use uma conta de teste que existe só na memória do servidor; no PowerShell:
 
 ```
-$env:PROFESSOR_TESTE = "professor@teste.br:senha-de-teste"; $env:CONVITE_PROFESSOR = "convite-teste"; npm run start:demo
+$env:PROFESSOR_TESTE = "professor@teste.br:senha-de-teste"; npm run start:demo
 ```
 
 Depois entre em `http://localhost:4173/demo/professor` com esse e-mail e essa senha. Para testar contra o Supabase de verdade, defina `SUPABASE_URL` e `SUPABASE_SECRET_KEY` no lugar de `PROFESSOR_TESTE`.

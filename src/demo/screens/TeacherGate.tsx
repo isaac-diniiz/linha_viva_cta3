@@ -5,9 +5,26 @@ import { TeacherLogin } from "./TeacherLogin";
 
 type Access =
   | { status: "checking" }
-  | { status: "login" }
+  /** inviteRequired false: o servidor aceita cadastro sem código de convite. */
+  | { status: "login"; inviteRequired: boolean }
   /** email null: modo local, sem login. */
   | { status: "in"; email: string | null };
+
+/** Pergunta ao servidor quem é o professor e, sem sessão, se o cadastro exige convite. */
+async function askServer(): Promise<Access> {
+  try {
+    const response = await fetch("/demo/api/eu");
+    const data = await response.json().catch(() => null);
+    if (response.ok && data) return { status: "in", email: data.email ?? null };
+    // na dúvida (servidor antigo, resposta estranha), pede o código
+    return {
+      status: "login",
+      inviteRequired: data?.conviteObrigatorio !== false,
+    };
+  } catch {
+    return { status: "login", inviteRequired: true };
+  }
+}
 
 /**
  * Decide entre a entrada do professor e o painel. O painel só conecta à turma
@@ -18,17 +35,7 @@ export function TeacherGate() {
 
   useEffect(() => {
     let alive = true;
-    void fetch("/demo/api/eu")
-      .then(async (response) => {
-        const data = response.ok ? await response.json() : null;
-        if (!alive) return;
-        setAccess(
-          data
-            ? { status: "in", email: data.email ?? null }
-            : { status: "login" },
-        );
-      })
-      .catch(() => alive && setAccess({ status: "login" }));
+    void askServer().then((next) => alive && setAccess(next));
     return () => {
       alive = false;
     };
@@ -40,7 +47,13 @@ export function TeacherGate() {
         account={access.email}
         onSignOut={async () => {
           await fetch("/demo/api/sair", { method: "POST" }).catch(() => {});
-          setAccess({ status: "login" });
+          // pergunta de novo: sem sessão, a resposta diz se o convite é exigido
+          const next = await askServer();
+          setAccess(
+            next.status === "login"
+              ? next
+              : { status: "login", inviteRequired: true },
+          );
         }}
       />
     );
@@ -51,6 +64,7 @@ export function TeacherGate() {
         <div className="loading">Verificando acesso…</div>
       ) : (
         <TeacherLogin
+          inviteRequired={access.inviteRequired}
           onSignedIn={(email) => setAccess({ status: "in", email })}
         />
       )}

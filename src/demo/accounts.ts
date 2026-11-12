@@ -74,7 +74,7 @@ export function teacherAccounts(
   const invite = env.CONVITE_PROFESSOR || undefined;
   if (!invite)
     warnings.push(
-      "CONVITE_PROFESSOR não definido: o cadastro de novos professores fica fechado.",
+      "CONVITE_PROFESSOR não definido: qualquer pessoa com o link pode criar conta de professor. Defina um código para exigir convite no cadastro.",
     );
   return { source, directory, invite, secret, warnings };
 }
