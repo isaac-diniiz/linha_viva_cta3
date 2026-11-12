@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Board } from "../../components/Board";
+import { LineCreator } from "../../components/LineCreator";
 import { ThemePicker } from "../../components/ThemePicker";
 import type { Preview } from "../../domain/preview";
 import { useLocalDemo } from "../client";
@@ -33,8 +34,16 @@ export function Teacher({
   const [localPreviews, setLocalPreviews] = useState<Record<string, Preview>>(
     {},
   );
+  // formulário aberto: linha nova (sem editId) ou edição de uma linha criada
+  const [lineForm, setLineForm] = useState<{ editId?: string } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const cards = ownCards(state);
+  const waiting = state?.status === "waiting";
+  const customLines = state?.customLines ?? [];
+  const editedLine = lineForm?.editId
+    ? customLines.find((line) => line.id === lineForm.editId)
+    : undefined;
   const setLocalPreview = (itemId: string, preview: Preview | null) =>
     setLocalPreviews((current) => replacePreview(current, itemId, preview));
   const action = (payload: unknown) => {
@@ -97,6 +106,115 @@ export function Teacher({
           onChoose={(themeId) => action({ type: "theme", themeId })}
         />
       )}
+      {state?.themes && (
+        <div className="line-creator-bar">
+          <button
+            type="button"
+            className="button secondary"
+            aria-expanded={waiting && lineForm !== null && !lineForm.editId}
+            disabled={!connected || !waiting}
+            onClick={() => setLineForm({})}
+          >
+            Criar linha
+          </button>
+          <span className="small-help">
+            {waiting
+              ? "Monte uma linha com o seu tema, as pontas e os cartões."
+              : "Só dá para criar uma linha antes de iniciar. Use Reiniciar demonstração para criar outra."}
+          </span>
+        </div>
+      )}
+      {state?.themes && customLines.length > 0 && (
+        <section className="custom-lines">
+          <div className="section-label">Suas linhas criadas</div>
+          <ul>
+            {customLines.map((line) => (
+              <li key={line.id}>
+                <span className="custom-line-title">{line.titulo}</span>
+                <span className="small-help">
+                  {line.cartoes.length} cartões · {line.inicio} → {line.fim}
+                </span>
+                {confirmDeleteId === line.id ? (
+                  <span className="custom-line-actions">
+                    <span className="small-help">
+                      Apagar esta linha? Isso não pode ser desfeito.
+                    </span>
+                    <button
+                      type="button"
+                      className="button danger"
+                      disabled={!connected || !waiting}
+                      onClick={() => {
+                        setConfirmDeleteId(null);
+                        if (lineForm?.editId === line.id) setLineForm(null);
+                        action({ type: "deleteTheme", id: line.id });
+                      }}
+                    >
+                      Sim, apagar
+                    </button>
+                    <button
+                      type="button"
+                      className="button subtle"
+                      onClick={() => setConfirmDeleteId(null)}
+                    >
+                      Não apagar
+                    </button>
+                  </span>
+                ) : (
+                  <span className="custom-line-actions">
+                    <button
+                      type="button"
+                      className="button secondary"
+                      aria-label={`Editar ${line.titulo}`}
+                      disabled={!connected || !waiting}
+                      onClick={() => {
+                        setConfirmDeleteId(null);
+                        setLineForm({ editId: line.id });
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="button subtle"
+                      aria-label={`Apagar ${line.titulo}`}
+                      disabled={!connected || !waiting}
+                      onClick={() => setConfirmDeleteId(line.id)}
+                    >
+                      Apagar
+                    </button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {!waiting && (
+            <p className="small-help">
+              Só dá para editar ou apagar uma linha antes de iniciar.
+            </p>
+          )}
+        </section>
+      )}
+      {state?.themes &&
+        waiting &&
+        lineForm &&
+        (!lineForm.editId || editedLine) && (
+          <LineCreator
+            key={lineForm.editId ?? "nova"}
+            storage={state.linesStorage}
+            savedKey={
+              lineForm.editId ? JSON.stringify(editedLine) : state.themes.length
+            }
+            editing={editedLine && { id: editedLine.id, form: editedLine }}
+            onSubmit={(line) =>
+              action(
+                lineForm.editId
+                  ? { type: "updateTheme", id: lineForm.editId, line }
+                  : { type: "createTheme", line },
+              )
+            }
+            onClose={() => setLineForm(null)}
+          />
+        )}
       {state && (
         <div className="cards-per-participant">
           <label className="teacher-plays">

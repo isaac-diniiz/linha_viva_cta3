@@ -38,7 +38,7 @@ export function supabaseDirectory(client: AuthClient): TeacherDirectory {
 }
 
 /** Cliente do Supabase para o servidor, sem guardar sessão em disco. */
-export function serverSupabase(url: string, secretKey: string): AuthClient {
+export function serverSupabase(url: string, secretKey: string): SupabaseClient {
   return createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

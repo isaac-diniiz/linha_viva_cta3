@@ -44,30 +44,32 @@ try {
     if (file.endsWith(".sql"))
       await db.exec(await readFile(new URL(file, migrations), "utf8"));
   await db.exec("create extension pgtap with schema extensions");
-  const assertions = (
-    await readFile(
-      new URL("../supabase/tests/database/session.test.sql", import.meta.url),
-      "utf8",
+  const tests = new URL("../supabase/tests/database/", import.meta.url);
+  let failed = false;
+  for (const file of (await readdir(tests)).sort()) {
+    if (!file.endsWith(".test.sql")) continue;
+    console.log(`# ${file}`);
+    const assertions = (await readFile(new URL(file, tests), "utf8")).replace(
+      /^begin;\s*create extension if not exists pgtap with schema extensions;/i,
+      "",
+    );
+    await db.exec("begin; set local search_path = public, extensions;");
+    const results = await db.exec(assertions);
+    const lines = results.flatMap((result) =>
+      result.rows.flatMap((row) => Object.values(row)),
+    );
+    for (const line of lines)
+      if (typeof line === "string" && /^(not ok|ok |1\.\.|#)/.test(line))
+        console.log(line);
+    if (
+      lines.some(
+        (line) =>
+          typeof line === "string" && /not ok|Failed \d+ tests?/.test(line),
+      )
     )
-  ).replace(
-    /^begin;\s*create extension if not exists pgtap with schema extensions;/i,
-    "",
-  );
-  await db.exec("begin; set local search_path = public, extensions;");
-  const results = await db.exec(assertions);
-  const lines = results.flatMap((result) =>
-    result.rows.flatMap((row) => Object.values(row)),
-  );
-  for (const line of lines)
-    if (typeof line === "string" && /^(not ok|ok |1\.\.|#)/.test(line))
-      console.log(line);
-  if (
-    lines.some(
-      (line) =>
-        typeof line === "string" && /not ok|Failed \d+ tests?/.test(line),
-    )
-  )
-    process.exitCode = 1;
+      failed = true;
+  }
+  if (failed) process.exitCode = 1;
   else console.log("Migração e pgTAP concluídos no PostgreSQL em WASM.");
 } catch (error) {
   console.error(error);

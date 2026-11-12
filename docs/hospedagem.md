@@ -5,6 +5,7 @@ A versão usada na escola é o servidor Node da demonstração, hospedado no [Re
 ## Como funciona e o que esperar
 
 - **Uma sessão por servidor, em memória.** A turma, os cartões e a linha ficam na memória do processo. Um reinício do serviço (nova publicação, queda ou o serviço "dormir") apaga a sessão e gera outro código de turma.
+- **As linhas criadas pelos professores** (botão **Criar linha**) ficam no Supabase, na tabela `demo_lines`, e sobrevivem aos reinícios. Sem o Supabase configurado, ficam em arquivos da pasta `atividades/` e somem quando o Render reinicia o serviço.
 - **O plano gratuito dorme** depois de 15 minutos sem receber nenhuma requisição ou mensagem WebSocket, e leva cerca de 1 minuto para acordar. Enquanto houver uma tela aberta (professor, projeção ou aluno), cada uma envia uma pulsação a cada 60 segundos, o que mantém o serviço acordado durante a aula, mesmo quando ninguém move cartões.
 - **Publicação automática.** Cada push na branch `main` publica uma nova versão, o que reinicia o serviço. Não faça push para `main` durante uma aula.
 - **Região.** O servidor fica na Virgínia (EUA), a região do Render mais próxima do Brasil. O tempo de ida e volta esperado é de 120 a 180 ms; a meta do projeto é até 300 ms.
@@ -16,6 +17,7 @@ A versão usada na escola é o servidor Node da demonstração, hospedado no [Re
 1. Crie um projeto gratuito em [supabase.com](https://supabase.com), com uma conta da equipe, na região **South America (São Paulo)**.
 2. Em **Authentication → Sign In / Providers**: deixe **Email** ligado, **desligue "Allow new users to sign up"** (as contas só nascem pelo servidor da Linha Viva, que confere o código de convite) e **desligue "Confirm email"** (o plano gratuito tem limite baixo de e-mails).
 3. Em **Project Settings → API Keys**, copie a **URL do projeto** e a **chave secreta** (_secret key_). A chave secreta dá acesso total ao projeto: não a coloque no repositório nem em mensagens; ela vai direto para o painel do Render.
+4. Crie a tabela das linhas criadas pelo professor: em **SQL Editor → New query**, cole todo o conteúdo de [`supabase/migrations/20261111000100_demo_lines.sql`](../supabase/migrations/20261111000100_demo_lines.sql) e clique em **Run**. Só esse arquivo é necessário: as outras migrações são da versão Supabase congelada ([supabase.md](supabase.md)). A tabela nasce com a RLS ligada e sem nenhuma política, então só o servidor, com a chave secreta, lê e grava nela; o navegador nunca acessa. Ela guarda apenas o texto que o professor escreveu (tema, pontas, cartões) e o e-mail de quem criou, nenhum dado de estudante.
 
 ### 2. Render
 
@@ -32,9 +34,10 @@ A versão usada na escola é o servidor Node da demonstração, hospedado no [Re
    Professor: https://linha-viva.onrender.com/demo/professor
    Alunos: https://linha-viva.onrender.com/demo/aluno/1A2B3C4D
    Contas de professor: supabase
+   Linhas criadas: supabase
    ```
 
-   Se aparecer outra linha de aviso (`Sem contas de professor`, `CONVITE_PROFESSOR não definido` ou `SESSAO_SEGREDO ausente`), falta a variável indicada em **Environment**.
+   Se aparecer outra linha de aviso (`Sem contas de professor`, `CONVITE_PROFESSOR não definido`, `SESSAO_SEGREDO ausente` ou `Sem SUPABASE_URL e SUPABASE_SECRET_KEY, as linhas criadas ficam só em arquivos`), falta a variável indicada em **Environment**. Se, ao criar uma linha, o painel disser que a tabela `demo_lines` não existe, falta o passo 4 do Supabase.
 
 Um serviço criado antes desta versão ainda usa `DEMO_TEACHER_KEY`: adicione as variáveis acima em **Environment** e apague `DEMO_TEACHER_KEY`, que não é mais usada.
 

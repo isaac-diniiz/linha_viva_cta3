@@ -1,7 +1,7 @@
 /** Texto máximo de um cartão, para caber legível no celular e na projeção. */
 export const MAX_CARD_LENGTH = 60;
-const MIN_CARDS = 3;
-const MAX_CARDS = 40;
+export const MIN_CARDS = 3;
+export const MAX_CARDS = 40;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export type ThemeCard = { id: string; label: string; year?: number };
