@@ -104,12 +104,13 @@ describe("endereços de cadastro e login", () => {
     server = null;
   });
 
-  async function start(invite = "turma-viva") {
+  /** `invite` null: servidor sem CONVITE_PROFESSOR, com o cadastro aberto. */
+  async function start(invite: string | null = "turma-viva") {
     const directory = fakeDirectory();
     const handle = createAuthHandler({
       directory,
       secret: SECRET,
-      invite,
+      invite: invite ?? undefined,
       now: () => 0,
     });
     server = createServer((request, response) => {
@@ -148,6 +149,47 @@ describe("endereços de cadastro e login", () => {
       headers: { cookie: cookieOf(response) },
     });
     expect(await me.json()).toEqual({ email: "ana@escola.br" });
+  });
+
+  it("sem convite configurado, o cadastro fica aberto e já entra", async () => {
+    const { post, base, directory } = await start(null);
+    const response = await post("/demo/api/cadastro", {
+      email: "ana@escola.br",
+      senha: "senha-forte",
+    });
+    expect(response.status).toBe(201);
+    expect(directory.accounts.get("ana@escola.br")).toBe("senha-forte");
+    const me = await fetch(`${base}/demo/api/eu`, {
+      headers: { cookie: cookieOf(response) },
+    });
+    expect(await me.json()).toEqual({ email: "ana@escola.br" });
+  });
+
+  it("com o cadastro aberto, e-mail inválido e senha curta continuam recusados", async () => {
+    const { post, directory } = await start(null);
+    const badEmail = await post("/demo/api/cadastro", {
+      email: "sem-arroba",
+      senha: "senha-forte",
+    });
+    expect(badEmail.status).toBe(400);
+    const shortPassword = await post("/demo/api/cadastro", {
+      email: "ana@escola.br",
+      senha: "curta",
+    });
+    expect(shortPassword.status).toBe(400);
+    expect(directory.accounts.size).toBe(0);
+  });
+
+  it("quem não entrou fica sabendo se o convite é exigido", async () => {
+    const withInvite = await start("turma-viva");
+    const required = await fetch(`${withInvite.base}/demo/api/eu`);
+    expect(required.status).toBe(401);
+    expect((await required.json()).conviteObrigatorio).toBe(true);
+    await new Promise((done) => server?.close(done));
+    const open = await start(null);
+    const free = await fetch(`${open.base}/demo/api/eu`);
+    expect(free.status).toBe(401);
+    expect((await free.json()).conviteObrigatorio).toBe(false);
   });
 
   it("recusa cadastro sem o convite certo, com senha curta ou e-mail inválido", async () => {

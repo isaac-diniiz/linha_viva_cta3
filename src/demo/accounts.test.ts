@@ -49,9 +49,15 @@ describe("configuração das contas de professor", () => {
     expect(short.secret).not.toBe("curto");
   });
 
-  it("avisa quando não há código de convite, pois o cadastro fica fechado", () => {
-    expect(teacherAccounts({}).warnings.join("\n")).toMatch(
-      /CONVITE_PROFESSOR/,
-    );
+  it("avisa quando não há código de convite, pois o cadastro fica aberto a qualquer pessoa", () => {
+    const warnings = teacherAccounts({}).warnings.join("\n");
+    expect(warnings).toMatch(/CONVITE_PROFESSOR/);
+    expect(warnings).toMatch(/qualquer pessoa/);
+  });
+
+  it("com código de convite, não avisa sobre cadastro aberto", () => {
+    const config = teacherAccounts({ CONVITE_PROFESSOR: "turma-viva" });
+    expect(config.invite).toBe("turma-viva");
+    expect(config.warnings.join("\n")).not.toMatch(/qualquer pessoa/);
   });
 });

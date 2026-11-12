@@ -28,8 +28,11 @@ async function submit(
 
 export function TeacherLogin({
   onSignedIn,
+  inviteRequired = true,
 }: {
   onSignedIn: (email: string) => void;
+  /** false quando o servidor aceita cadastro sem código de convite. */
+  inviteRequired?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>("entrar");
   const [email, setEmail] = useState("");
@@ -46,7 +49,7 @@ export function TeacherLogin({
     const result = await submit(mode, {
       email,
       senha: password,
-      ...(signup ? { convite: invite } : {}),
+      ...(signup && inviteRequired ? { convite: invite } : {}),
     });
     setBusy(false);
     if (result.email) onSignedIn(result.email);
@@ -58,7 +61,9 @@ export function TeacherLogin({
       <h1>{signup ? "Criar conta de professor" : "Entrar como professor"}</h1>
       <p>
         {signup
-          ? "Use o código de convite que a equipe da Linha Viva passou para você."
+          ? inviteRequired
+            ? "Use o código de convite que a equipe da Linha Viva passou para você."
+            : "Crie a sua conta para abrir a turma e conduzir a linha."
           : "Entre para abrir a turma, escolher a atividade e conduzir a linha."}
       </p>
       {error && (
@@ -88,7 +93,7 @@ export function TeacherLogin({
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
-        {signup && (
+        {signup && inviteRequired && (
           <label>
             Código de convite
             <input

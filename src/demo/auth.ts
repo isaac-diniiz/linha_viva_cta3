@@ -176,8 +176,9 @@ async function readJson(
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
 /**
- * Endereços de conta do professor sob /demo/api: cadastro (com convite),
- * entrar, sair e eu. Devolve false para qualquer outro endereço.
+ * Endereços de conta do professor sob /demo/api: cadastro, entrar, sair e eu.
+ * Com `invite` definido, o cadastro exige esse código; sem ele, o cadastro fica
+ * aberto a quem tiver o link. Devolve false para qualquer outro endereço.
  */
 export function createAuthHandler({
   directory,
@@ -207,7 +208,12 @@ export function createAuthHandler({
     if (path === "/demo/api/eu" && request.method === "GET") {
       const teacher = teacherFromCookie(request.headers.cookie, secret, now());
       if (teacher) reply(response, 200, teacher);
-      else reply(response, 401, { erro: "Entre como professor." });
+      // a tela de entrada usa conviteObrigatorio para pedir ou não o código
+      else
+        reply(response, 401, {
+          erro: "Entre como professor.",
+          conviteObrigatorio: invite !== undefined,
+        });
       return true;
     }
     if (path === "/demo/api/sair" && request.method === "POST") {
@@ -243,7 +249,7 @@ export function createAuthHandler({
     const password = text(body.senha);
 
     if (isSignup) {
-      if (!inviteMatches(text(body.convite), invite)) {
+      if (invite !== undefined && !inviteMatches(text(body.convite), invite)) {
         reply(response, 403, { erro: "Código de convite incorreto." });
         return true;
       }

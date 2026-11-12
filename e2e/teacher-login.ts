@@ -8,8 +8,11 @@ export const testTeacher = (() => {
   return { email, password: password.join(":") };
 })();
 
-/** Código de convite do servidor de teste (CONVITE_PROFESSOR). */
-export const testInvite = process.env.CONVITE_PROFESSOR ?? "convite-teste";
+/**
+ * Código de convite do servidor de teste (CONVITE_PROFESSOR). A CI não define
+ * nenhum: o cadastro fica aberto e a tela não pede o código.
+ */
+export const testInvite = process.env.CONVITE_PROFESSOR || undefined;
 
 /** Abre o painel do professor, entrando com a conta de teste. */
 export async function openTeacher(page: Page) {

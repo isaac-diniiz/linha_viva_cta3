@@ -16,7 +16,8 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
-      # código que a equipe passa a quem pode criar conta de professor
+      # opcional: com um código, só quem o souber cria conta de professor;
+      # em branco, qualquer pessoa com o link cria
       - key: CONVITE_PROFESSOR
         sync: false
       # assina os logins; gerado pelo Render e mantido entre publicações
