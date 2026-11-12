@@ -4,6 +4,7 @@ import { join, resolve, sep } from "node:path";
 import { teacherAccounts } from "./accounts";
 import { createAuthHandler } from "./auth";
 import { demoLinks } from "./links";
+import { customLineStore } from "./lineStore";
 import { attachDemoServer } from "./server";
 
 const root = resolve(process.cwd(), "dist");
@@ -47,9 +48,15 @@ const server = createServer(async (request, response) => {
   }
 });
 
+const activitiesDir =
+  process.env.LINHA_VIVA_ATIVIDADES ?? resolve(process.cwd(), "atividades");
+// onde ficam as linhas criadas pelo professor: Supabase (como as contas) ou arquivos
+const lines = customLineStore(process.env, activitiesDir);
 const { code } = attachDemoServer(server, {
   publicMode: true,
   sessionSecret: accounts.secret,
+  activitiesDir,
+  lines: lines.store,
 });
 const port = Number(process.env.PORT ?? 4173);
 server.listen(port, "0.0.0.0", () => {
@@ -57,5 +64,7 @@ server.listen(port, "0.0.0.0", () => {
   console.log(`Professor: ${links.teacher}`);
   console.log(`Alunos: ${links.students}`);
   console.log(`Contas de professor: ${accounts.source}`);
-  for (const warning of accounts.warnings) console.warn(warning);
+  console.log(`Linhas criadas: ${lines.store.source}`);
+  for (const warning of [...accounts.warnings, ...lines.warnings])
+    console.warn(warning);
 });

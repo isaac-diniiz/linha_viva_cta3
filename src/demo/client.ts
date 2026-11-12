@@ -5,6 +5,7 @@ import {
   type PreviewState,
 } from "../domain/preview";
 import { newId } from "../domain/id";
+import type { CustomLineEntry } from "./customLine";
 import {
   canAcceptDemoPreview,
   type DemoStatus,
@@ -20,6 +21,10 @@ export type DemoSnapshot = {
   themeId: string;
   /** Temas disponíveis; só o professor recebe a lista. */
   themes?: ThemeSummary[];
+  /** Linhas criadas no painel, prontas para editar; só o professor recebe. */
+  customLines?: CustomLineEntry[];
+  /** Onde as linhas criadas ficam guardadas; só o professor recebe. */
+  linesStorage?: "supabase" | "arquivos";
   items: { id: string; label: string }[];
   confirmedOrder: string[];
   confirmedPositions: Record<string, number>;

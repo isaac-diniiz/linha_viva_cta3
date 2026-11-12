@@ -4,9 +4,16 @@ import type { IncomingMessage } from "node:http";
 import { resolve } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { acceptPreview, expirePreviews, type Preview } from "../domain/preview";
-import type { Theme } from "./activity";
+import { parseActivity, type Theme } from "./activity";
 import { teacherFromCookie } from "./auth";
-import { findTheme, loadActivities } from "./catalog";
+import { activityFileIds, findTheme, loadActivities } from "./catalog";
+import {
+  createCustomActivity,
+  isCustomLineId,
+  lineFormOf,
+  type CustomLineEntry,
+} from "./customLine";
+import { fileLineStore, type LineStore } from "./lineStore";
 import {
   assignStudent,
   canAcceptDemoPreview,
@@ -36,10 +43,24 @@ function optionalId(value: unknown): string | undefined {
 }
 
 const DEFAULT_THEME_ID = "ciclo-da-agua";
+/** Limite de atividades no menu, para o catálogo não crescer sem controle. */
+const MAX_THEMES = 100;
 
-/** Carrega o catálogo, avisa sobre arquivos rejeitados e escolhe o tema inicial. */
-function prepareCatalog(dir: string, preferredId: string | undefined) {
+/**
+ * Carrega o catálogo, avisa sobre arquivos rejeitados e escolhe o tema inicial.
+ * Com `customFromFiles` falso (linhas no Supabase), os arquivos `criada-*` da
+ * pasta ficam de fora: as linhas criadas vêm só do armazenamento.
+ */
+function prepareCatalog(
+  dir: string,
+  preferredId: string | undefined,
+  customFromFiles: boolean,
+) {
   const catalog = loadActivities(dir);
+  if (!customFromFiles)
+    catalog.themes = catalog.themes.filter(
+      (theme) => !isCustomLineId(theme.id),
+    );
   for (const { file, errors } of catalog.rejected)
     console.warn(
       `Atividade rejeitada (${file}):\n${errors.map((error) => `  - ${error}`).join("\n")}`,
@@ -56,6 +77,22 @@ function prepareCatalog(dir: string, preferredId: string | undefined) {
   return { themes: catalog.themes, initial };
 }
 
+/** Linhas criadas no painel, no formato do formulário, para o professor editar. */
+function customLinesOf(themes: Theme[]): CustomLineEntry[] {
+  return themes
+    .filter((theme) => isCustomLineId(theme.id))
+    .map((theme) => ({ id: theme.id, ...lineFormOf(theme) }));
+}
+
+/** Id do pedido, para a resposta falha chegar a quem a esperava. */
+function requestIdOf(raw: { toString(): string }): string | undefined {
+  try {
+    return (JSON.parse(raw.toString()) as { requestId?: string }).requestId;
+  } catch {
+    return undefined;
+  }
+}
+
 export function attachDemoServer(
   httpServer: NonNullable<ViteDevServer["httpServer"]>,
   {
@@ -63,15 +100,22 @@ export function attachDemoServer(
     sessionSecret,
     theme = process.env.LINHA_VIVA_TEMA,
     activitiesDir = process.env.LINHA_VIVA_ATIVIDADES ?? resolve("atividades"),
+    lines = fileLineStore(activitiesDir),
   }: {
     publicMode?: boolean;
     /** Segredo das sessões de professor; no modo público, sem ele ninguém conduz. */
     sessionSecret?: string;
     theme?: string;
     activitiesDir?: string;
+    /** Onde ficam as linhas criadas pelo professor; por padrão, arquivos em `activitiesDir`. */
+    lines?: LineStore;
   } = {},
 ) {
-  const catalog = prepareCatalog(activitiesDir, theme);
+  const catalog = prepareCatalog(
+    activitiesDir,
+    theme,
+    lines.source === "arquivos",
+  );
   const projectionKey = randomBytes(24).toString("hex");
   const newState = (selected: Theme = catalog.initial, deal?: Deal) => {
     const result = createDemoState(selected, Math.random, deal);
@@ -81,6 +125,11 @@ export function attachDemoServer(
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16_384 });
   const clients = new Map<WebSocket, Client>();
   let state = newState();
+
+  // As linhas criadas são gravadas uma de cada vez: cada ação confere o estado,
+  // grava no armazenamento e só então muda o menu, e o início da atividade espera.
+  let lineQueue: Promise<void> = Promise.resolve();
+  let savingLines = 0;
 
   const send = (socket: WebSocket, message: unknown) => {
     if (socket.readyState === WebSocket.OPEN)
@@ -100,6 +149,10 @@ export function attachDemoServer(
       themeId: state.themeId,
       themes:
         client.role === "teacher" ? listThemes(catalog.themes) : undefined,
+      // só o professor recebe as linhas que criou, com os cartões na ordem certa, para editar
+      customLines:
+        client.role === "teacher" ? customLinesOf(catalog.themes) : undefined,
+      linesStorage: client.role === "teacher" ? lines.source : undefined,
       items: state.items,
       confirmedOrder: state.confirmedOrder,
       confirmedPositions: state.confirmedPositions,
@@ -143,6 +196,56 @@ export function attachDemoServer(
           ? error.message
           : "Não foi possível concluir a ação.",
     });
+
+  const queueLineAction = (
+    socket: WebSocket,
+    raw: { toString(): string },
+    action: () => Promise<void>,
+  ) => {
+    savingLines++;
+    lineQueue = lineQueue
+      .then(action)
+      .then(publish)
+      .catch((error) => fail(socket, error, requestIdOf(raw)))
+      .finally(() => {
+        savingLines--;
+      });
+  };
+
+  // linhas guardadas no armazenamento entram no menu assim que chegam
+  const ready = (async () => {
+    let saved: unknown[];
+    try {
+      saved = await lines.load();
+    } catch (error) {
+      console.warn(
+        `Não foi possível carregar as linhas criadas: ${(error as Error).message}`,
+      );
+      return;
+    }
+    let added = 0;
+    for (const raw of saved) {
+      const parsed = parseActivity(raw);
+      if (!parsed.ok) {
+        console.warn(
+          `Linha guardada rejeitada:\n${parsed.errors.map((error) => `  - ${error}`).join("\n")}`,
+        );
+        continue;
+      }
+      const id = parsed.theme.id;
+      if (
+        !isCustomLineId(id) ||
+        catalog.themes.some((existing) => existing.id === id) ||
+        catalog.themes.length >= MAX_THEMES
+      ) {
+        console.warn(`Linha guardada ignorada: ${id}.`);
+        continue;
+      }
+      catalog.themes.push(parsed.theme);
+      added++;
+    }
+    if (added) publish();
+  })();
 
   httpServer.on("upgrade", (request, socket, head) => {
     if (new URL(request.url ?? "/", "http://localhost").pathname !== "/demo-ws")
@@ -260,6 +363,8 @@ export function attachDemoServer(
         if (message.type === "status") {
           if (!["active", "paused", "ended"].includes(String(message.status)))
             throw new Error("Estado inválido.");
+          if (savingLines > 0)
+            throw new Error("Aguarde a linha terminar de salvar.");
           setDemoStatus(state, message.status as DemoStatus);
         } else if (message.type === "reveal") {
           state.revealed = true;
@@ -269,6 +374,92 @@ export function attachDemoServer(
             state,
             findTheme(catalog.themes, String(message.themeId)),
           );
+        } else if (message.type === "createTheme") {
+          queueLineAction(socket, raw, async () => {
+            if (state.status !== "waiting")
+              throw new Error(
+                "Só é possível criar uma linha antes de iniciar a atividade.",
+              );
+            if (catalog.themes.length >= MAX_THEMES)
+              throw new Error(`O menu já tem ${MAX_THEMES} atividades.`);
+            const created = createCustomActivity(message.line, [
+              ...catalog.themes.map((existing) => existing.id),
+              ...activityFileIds(activitiesDir),
+            ]);
+            if (!created.ok) throw new Error(created.errors.join(" "));
+            const persisted = await lines.create(
+              created.theme.id,
+              created.raw,
+              teacher?.email ?? null,
+            );
+            if (!persisted)
+              console.warn(
+                `A linha "${created.theme.title}" vale só até o servidor reiniciar.`,
+              );
+            catalog.themes.push(created.theme);
+            state = changeTheme(state, created.theme);
+          });
+          return;
+        } else if (message.type === "updateTheme") {
+          queueLineAction(socket, raw, async () => {
+            if (state.status !== "waiting")
+              throw new Error(
+                "Só é possível editar uma linha antes de iniciar a atividade.",
+              );
+            const id = message.id;
+            if (
+              !isCustomLineId(id) ||
+              !catalog.themes.some((existing) => existing.id === id)
+            )
+              throw new Error("Só dá para editar as linhas criadas no painel.");
+            const edited = createCustomActivity(message.line, [], id);
+            if (!edited.ok) throw new Error(edited.errors.join(" "));
+            const persisted = await lines.replace(
+              id,
+              edited.raw,
+              teacher?.email ?? null,
+            );
+            if (!persisted)
+              console.warn(
+                `A edição de "${edited.theme.title}" vale só até o servidor reiniciar.`,
+              );
+            const index = catalog.themes.findIndex(
+              (existing) => existing.id === id,
+            );
+            if (index >= 0) catalog.themes[index] = edited.theme;
+            // a turma só recebe cartões novos se a linha editada é a que está em uso
+            if (state.themeId === id) state = changeTheme(state, edited.theme);
+          });
+          return;
+        } else if (message.type === "deleteTheme") {
+          queueLineAction(socket, raw, async () => {
+            if (state.status !== "waiting")
+              throw new Error(
+                "Só é possível apagar uma linha antes de iniciar a atividade.",
+              );
+            const id = message.id;
+            if (
+              !isCustomLineId(id) ||
+              !catalog.themes.some((existing) => existing.id === id)
+            )
+              throw new Error("Só dá para apagar as linhas criadas no painel.");
+            if (catalog.themes.length <= 1)
+              throw new Error(
+                "O menu precisa ficar com pelo menos uma atividade.",
+              );
+            await lines.remove(id);
+            catalog.themes.splice(
+              catalog.themes.findIndex((existing) => existing.id === id),
+              1,
+            );
+            if (state.themeId === id)
+              state = changeTheme(
+                state,
+                catalog.themes.find((theme) => theme.id === DEFAULT_THEME_ID) ??
+                  catalog.themes[0],
+              );
+          });
+          return;
         } else if (message.type === "teacherPlays") {
           state = setTeacherPlays(state, message.value as boolean);
         } else if (message.type === "cardsPerParticipant") {
@@ -281,15 +472,7 @@ export function attachDemoServer(
         } else throw new Error("Ação desconhecida.");
         publish();
       } catch (error) {
-        const requestId = (() => {
-          try {
-            return (JSON.parse(raw.toString()) as { requestId?: string })
-              .requestId;
-          } catch {
-            return undefined;
-          }
-        })();
-        fail(socket, error, requestId);
+        fail(socket, error, requestIdOf(raw));
       }
     });
     socket.on("close", () => {
@@ -313,7 +496,7 @@ export function attachDemoServer(
     for (const socket of clients.keys()) socket.terminate();
     wss.close();
   });
-  return { projectionKey, code: state.code };
+  return { projectionKey, code: state.code, ready };
 }
 
 export function localDemoPlugin(): Plugin {

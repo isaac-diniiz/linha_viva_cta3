@@ -1,6 +1,6 @@
 # Versão Supabase
 
-> **Congelada até depois da validação em sala (06/nov/2026).** O protótipo validado na escola é a demonstração em Node ([hospedagem.md](hospedagem.md)). Esta versão continua no repositório e na CI; a decisão está registrada no [AGENTS.md](../AGENTS.md), em "Decisão para a validação em sala". Temas, QR Code e votação por cartão repetido ainda não existem aqui.
+> **Congelada até depois da validação em sala (06/nov/2026).** O protótipo validado na escola é a demonstração em Node ([hospedagem.md](hospedagem.md)). Esta versão continua no repositório e na CI; a decisão está registrada no [AGENTS.md](../AGENTS.md), em "Decisão para a validação em sala". Temas, QR Code e votação por cartão repetido ainda não existem aqui. A migração `20261111000100_demo_lines.sql` é a única que a demonstração em Node usa: ela guarda as linhas criadas pelo professor ([hospedagem.md](hospedagem.md)).
 
 A versão Supabase usa PostgreSQL para atividades, sessões e posições confirmadas, Supabase Auth (código por e-mail para o professor, identidade anônima para alunos e projeção) e Realtime Broadcast em canais privados para as prévias de arraste. As regras ficam em funções SQL e políticas de Row Level Security em [`supabase/migrations/`](../supabase/migrations/).
 
