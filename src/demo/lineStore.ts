@@ -7,6 +7,9 @@ export const LINES_TABLE = "demo_lines";
 
 export type LinesClient = Pick<SupabaseClient, "from">;
 
+/** Linha guardada e o e-mail de quem a criou (nulo quando não se sabe). */
+export type StoredLine = { activity: unknown; owner: string | null };
+
 /** Onde ficam as linhas que o professor cria (Supabase em produção). */
 export type LineStore = {
   source: "supabase" | "arquivos";
@@ -15,7 +18,7 @@ export type LineStore = {
    * `atividades/` o catálogo já lê junto das atividades prontas, então o
    * armazenamento em arquivos devolve lista vazia.
    */
-  load(): Promise<unknown[]>;
+  load(): Promise<StoredLine[]>;
   /**
    * Grava a linha nova. Devolve `false` quando ela só vale até o servidor
    * reiniciar (a pasta não aceitou a gravação); lança erro se o armazenamento
@@ -63,10 +66,15 @@ export function supabaseLineStore(client: LinesClient): LineStore {
     async load() {
       const { data, error } = await client
         .from(LINES_TABLE)
-        .select("id, activity")
+        .select("id, activity, owner_email")
         .order("created_at", { ascending: true });
       if (error) refuse("Não foi possível ler as linhas do Supabase", error);
-      return (data ?? []).map((row: { activity: unknown }) => row.activity);
+      return (data ?? []).map(
+        (row: { activity: unknown; owner_email: string | null }) => ({
+          activity: row.activity,
+          owner: row.owner_email ?? null,
+        }),
+      );
     },
     create: insert,
     async replace(id, raw, owner) {

@@ -69,13 +69,16 @@ const activity = (title: string) => ({
 });
 
 describe("linhas criadas guardadas no Supabase", () => {
-  it("lê as atividades salvas, da mais antiga para a mais nova", async () => {
+  it("lê as atividades salvas com o e-mail de quem criou, da mais antiga para a mais nova", async () => {
     const { client, tables } = fakeClient([
       { id: "criada-a", owner_email: "ana@escola.br", activity: activity("A") },
       { id: "criada-b", owner_email: null, activity: activity("B") },
     ]);
     const lines = await supabaseLineStore(client).load();
-    expect(lines).toEqual([activity("A"), activity("B")]);
+    expect(lines).toEqual([
+      { activity: activity("A"), owner: "ana@escola.br" },
+      { activity: activity("B"), owner: null },
+    ]);
     expect(tables).toEqual([LINES_TABLE]);
   });
 

@@ -50,6 +50,7 @@ Cada professor abre `https://linha-viva.onrender.com/demo/professor`, clica em *
 - **Trocar o código de convite:** altere `CONVITE_PROFESSOR` no Render. Contas já criadas continuam valendo. Para voltar a exigir convite depois de um período aberto, defina o código e revise os usuários em **Authentication → Users**; para abrir o cadastro, apague a variável.
 - **Senhas erradas:** depois de 5 tentativas, o login daquela rede e daquele e-mail fica bloqueado por 15 minutos.
 - Ainda existe **uma única turma por servidor**: se dois professores entrarem ao mesmo tempo, os dois controlam a mesma sessão.
+- **Linhas criadas** são de quem as criou: cada professor vê, escolhe, edita e apaga só as próprias. A exceção é o tema que está em uso na turma, que aparece no menu de todos (mas só o dono edita). Linhas gravadas sem e-mail (uso local) ficam com todos.
 
 Para trocar a atividade aberta ao iniciar, altere `LINHA_VIVA_TEMA` em **Environment**. A lista de atividades e como cadastrar novas estão em [atividades.md](atividades.md).
 
