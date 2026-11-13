@@ -54,6 +54,8 @@ function memoryStore(
   options: {
     source?: LineStore["source"];
     initial?: unknown[];
+    /** Linhas guardadas com dono; `initial` entra sem dono identificado. */
+    owned?: { activity: unknown; owner: string | null }[];
     delayMs?: number;
     failing?: Partial<
       Record<"load" | "create" | "replace" | "remove", boolean>
@@ -70,7 +72,13 @@ function memoryStore(
     async load() {
       ops.push({ op: "load" });
       if (options.failing?.load) throw new Error("Supabase fora do ar.");
-      return options.initial ?? [];
+      return [
+        ...(options.initial ?? []).map((activity) => ({
+          activity,
+          owner: null,
+        })),
+        ...(options.owned ?? []),
+      ];
     },
     async create(id, raw, owner) {
       ops.push({ op: "create", id, owner });
@@ -98,6 +106,10 @@ function memoryStore(
   };
   return { store, rows, ops };
 }
+
+const SECRET = "s".repeat(40);
+const cookieOf = (email: string) =>
+  `lv_professor=${signSession({ email }, SECRET, Date.now())}`;
 
 describe("linhas criadas guardadas pelo servidor num armazenamento", () => {
   let server: Server | null = null;
@@ -468,5 +480,140 @@ describe("linhas criadas guardadas pelo servidor num armazenamento", () => {
       .poll(() => latest(teacher.received)?.customLines?.length)
       .toBe(1);
     expect(existsSync(join(dir, "criada-fases-da-escola.json"))).toBe(true);
+  });
+  describe("cada professor só vê as próprias linhas", () => {
+    const owned = () =>
+      memoryStore({
+        owned: [
+          {
+            activity: stored("criada-da-ana", "Da Ana"),
+            owner: "ana@escola.br",
+          },
+          {
+            activity: stored("criada-da-bia", "Da Bia"),
+            owner: "bia@escola.br",
+          },
+          { activity: stored("criada-sem-dono", "Sem dono"), owner: null },
+        ],
+      });
+    const ids = (snapshot?: Snapshot) => ({
+      themes: snapshot?.themes?.map((theme) => theme.id) ?? [],
+      custom: snapshot?.customLines?.map((entry) => entry.id) ?? [],
+    });
+    const startPublic = (store: LineStore) =>
+      start(store, { publicMode: true, sessionSecret: SECRET });
+
+    it("o menu e as linhas para editar mostram só as do professor e as sem dono", async () => {
+      const { store } = owned();
+      const { port } = await startPublic(store);
+      const ana = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("ana@escola.br"),
+      );
+      const bia = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("bia@escola.br"),
+      );
+      await expect.poll(() => ids(latest(bia.received)).custom.length).toBe(2);
+      const forAna = ids(latest(ana.received));
+      expect(forAna.custom).toEqual(["criada-da-ana", "criada-sem-dono"]);
+      expect(forAna.themes).toContain("ciclo-da-agua");
+      expect(forAna.themes).not.toContain("criada-da-bia");
+      const forBia = ids(latest(bia.received));
+      expect(forBia.custom).toEqual(["criada-da-bia", "criada-sem-dono"]);
+      expect(forBia.themes).not.toContain("criada-da-ana");
+    });
+
+    it("a linha nova aparece só para quem a criou", async () => {
+      const { store } = memoryStore();
+      const { port } = await startPublic(store);
+      const ana = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("ana@escola.br"),
+      );
+      const bia = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("bia@escola.br"),
+      );
+      send(ana, { type: "createTheme", line: line() });
+      await expect
+        .poll(() => ids(latest(ana.received)).custom)
+        .toEqual(["criada-fases-da-escola"]);
+      // a turma é a mesma: a Bia vê o tema em uso, mas não pode editá-lo
+      await expect
+        .poll(() => latest(bia.received)?.themeId)
+        .toBe("criada-fases-da-escola");
+      expect(ids(latest(bia.received)).custom).toEqual([]);
+    });
+
+    it("não deixa escolher, editar nem apagar a linha de outro professor", async () => {
+      const { store, ops } = owned();
+      const { port } = await startPublic(store);
+      const bia = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("bia@escola.br"),
+      );
+      send(bia, { type: "theme", themeId: "criada-da-ana" });
+      await expect
+        .poll(() => lastError(bia.received))
+        .toMatch(/não encontrad|Tema/i);
+      expect(latest(bia.received)?.themeId).toBe("ciclo-da-agua");
+      bia.received.length = 0;
+      send(bia, {
+        type: "updateTheme",
+        id: "criada-da-ana",
+        line: line({ titulo: "Invadida" }),
+      });
+      await expect
+        .poll(() => lastError(bia.received))
+        .toMatch(/Só dá para editar as linhas criadas por você/);
+      bia.received.length = 0;
+      send(bia, { type: "deleteTheme", id: "criada-da-ana" });
+      await expect
+        .poll(() => lastError(bia.received))
+        .toMatch(/Só dá para apagar as linhas criadas por você/);
+      expect(ops.filter((entry) => entry.op !== "load")).toEqual([]);
+      const ana = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("ana@escola.br"),
+      );
+      expect(
+        latest(ana.received)?.customLines?.find(
+          (entry) => entry.id === "criada-da-ana",
+        )?.titulo,
+      ).toBe("Da Ana");
+    });
+
+    it("o dono edita e apaga a própria linha, e a linha sem dono continua de todos", async () => {
+      const { store, ops } = owned();
+      const { port } = await startPublic(store);
+      const ana = await connect(
+        port,
+        { role: "teacher" },
+        cookieOf("ana@escola.br"),
+      );
+      send(ana, {
+        type: "updateTheme",
+        id: "criada-da-ana",
+        line: line({ titulo: "Da Ana, revista" }),
+      });
+      send(ana, { type: "deleteTheme", id: "criada-sem-dono" });
+      await expect
+        .poll(() => ids(latest(ana.received)).custom)
+        .toEqual(["criada-da-ana"]);
+      expect(latest(ana.received)?.customLines?.[0].titulo).toBe(
+        "Da Ana, revista",
+      );
+      // editar não troca o dono guardado
+      expect(ops.find((entry) => entry.op === "replace")?.owner).toBe(
+        "ana@escola.br",
+      );
+    });
   });
 });

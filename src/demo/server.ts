@@ -13,7 +13,7 @@ import {
   lineFormOf,
   type CustomLineEntry,
 } from "./customLine";
-import { fileLineStore, type LineStore } from "./lineStore";
+import { fileLineStore, type LineStore, type StoredLine } from "./lineStore";
 import {
   assignStudent,
   canAcceptDemoPreview,
@@ -35,7 +35,8 @@ import {
 } from "./domain";
 
 type Role = "teacher" | "projection" | "student";
-type Client = { role: Role; token?: string };
+/** `email`: professor logado; nulo no uso local, sem login. */
+type Client = { role: Role; token?: string; email?: string | null };
 
 /** Id de cartão vindo do cliente; ausente quando o participante tem um só. */
 function optionalId(value: unknown): string | undefined {
@@ -79,9 +80,7 @@ function prepareCatalog(
 
 /** Linhas criadas no painel, no formato do formulário, para o professor editar. */
 function customLinesOf(themes: Theme[]): CustomLineEntry[] {
-  return themes
-    .filter((theme) => isCustomLineId(theme.id))
-    .map((theme) => ({ id: theme.id, ...lineFormOf(theme) }));
+  return themes.map((theme) => ({ id: theme.id, ...lineFormOf(theme) }));
 }
 
 /** Id do pedido, para a resposta falha chegar a quem a esperava. */
@@ -125,6 +124,25 @@ export function attachDemoServer(
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16_384 });
   const clients = new Map<WebSocket, Client>();
   let state = newState();
+  // Dono de cada linha criada. Linha sem dono conhecido (uso local, ou arquivo
+  // lido da pasta) fica com todos os professores.
+  const owners = new Map<string, string | null>();
+  const isMine = (id: string, email: string | null) => {
+    const owner = owners.get(id) ?? null;
+    return owner === null || owner === email;
+  };
+  /** Atividades prontas e as linhas do professor; o tema em uso sempre aparece. */
+  const themesFor = (email: string | null) =>
+    catalog.themes.filter(
+      (theme) =>
+        !isCustomLineId(theme.id) ||
+        isMine(theme.id, email) ||
+        theme.id === state.themeId,
+    );
+  const ownLinesOf = (email: string | null) =>
+    catalog.themes.filter(
+      (theme) => isCustomLineId(theme.id) && isMine(theme.id, email),
+    );
 
   // As linhas criadas são gravadas uma de cada vez: cada ação confere o estado,
   // grava no armazenamento e só então muda o menu, e o início da atividade espera.
@@ -148,10 +166,14 @@ export function attachDemoServer(
       axis: state.axis,
       themeId: state.themeId,
       themes:
-        client.role === "teacher" ? listThemes(catalog.themes) : undefined,
+        client.role === "teacher"
+          ? listThemes(themesFor(client.email ?? null))
+          : undefined,
       // só o professor recebe as linhas que criou, com os cartões na ordem certa, para editar
       customLines:
-        client.role === "teacher" ? customLinesOf(catalog.themes) : undefined,
+        client.role === "teacher"
+          ? customLinesOf(ownLinesOf(client.email ?? null))
+          : undefined,
       linesStorage: client.role === "teacher" ? lines.source : undefined,
       items: state.items,
       confirmedOrder: state.confirmedOrder,
@@ -214,7 +236,7 @@ export function attachDemoServer(
 
   // linhas guardadas no armazenamento entram no menu assim que chegam
   const ready = (async () => {
-    let saved: unknown[];
+    let saved: StoredLine[];
     try {
       saved = await lines.load();
     } catch (error) {
@@ -224,7 +246,7 @@ export function attachDemoServer(
       return;
     }
     let added = 0;
-    for (const raw of saved) {
+    for (const { activity: raw, owner } of saved) {
       const parsed = parseActivity(raw);
       if (!parsed.ok) {
         console.warn(
@@ -242,6 +264,7 @@ export function attachDemoServer(
         continue;
       }
       catalog.themes.push(parsed.theme);
+      owners.set(id, owner);
       added++;
     }
     if (added) publish();
@@ -270,6 +293,7 @@ export function attachDemoServer(
           if (role !== "teacher" && role !== "projection" && role !== "student")
             throw new Error("Papel inválido.");
           const client: Client = { role };
+          if (role === "teacher") client.email = teacher?.email ?? null;
           if (publicMode && role === "teacher" && !teacher)
             throw new Error("Entre como professor.");
           if (
@@ -360,6 +384,7 @@ export function attachDemoServer(
         }
         if (client.role !== "teacher")
           throw new Error("A projeção é somente leitura.");
+        const email = client.email ?? null;
         if (message.type === "status") {
           if (!["active", "paused", "ended"].includes(String(message.status)))
             throw new Error("Estado inválido.");
@@ -372,7 +397,7 @@ export function attachDemoServer(
         } else if (message.type === "theme") {
           state = changeTheme(
             state,
-            findTheme(catalog.themes, String(message.themeId)),
+            findTheme(themesFor(email), String(message.themeId)),
           );
         } else if (message.type === "createTheme") {
           queueLineAction(socket, raw, async () => {
@@ -390,13 +415,14 @@ export function attachDemoServer(
             const persisted = await lines.create(
               created.theme.id,
               created.raw,
-              teacher?.email ?? null,
+              email,
             );
             if (!persisted)
               console.warn(
                 `A linha "${created.theme.title}" vale só até o servidor reiniciar.`,
               );
             catalog.themes.push(created.theme);
+            owners.set(created.theme.id, email);
             state = changeTheme(state, created.theme);
           });
           return;
@@ -412,12 +438,15 @@ export function attachDemoServer(
               !catalog.themes.some((existing) => existing.id === id)
             )
               throw new Error("Só dá para editar as linhas criadas no painel.");
+            if (!isMine(id, email))
+              throw new Error("Só dá para editar as linhas criadas por você.");
             const edited = createCustomActivity(message.line, [], id);
             if (!edited.ok) throw new Error(edited.errors.join(" "));
+            // editar não troca o dono da linha
             const persisted = await lines.replace(
               id,
               edited.raw,
-              teacher?.email ?? null,
+              owners.get(id) ?? null,
             );
             if (!persisted)
               console.warn(
@@ -443,11 +472,14 @@ export function attachDemoServer(
               !catalog.themes.some((existing) => existing.id === id)
             )
               throw new Error("Só dá para apagar as linhas criadas no painel.");
+            if (!isMine(id, email))
+              throw new Error("Só dá para apagar as linhas criadas por você.");
             if (catalog.themes.length <= 1)
               throw new Error(
                 "O menu precisa ficar com pelo menos uma atividade.",
               );
             await lines.remove(id);
+            owners.delete(id);
             catalog.themes.splice(
               catalog.themes.findIndex((existing) => existing.id === id),
               1,
