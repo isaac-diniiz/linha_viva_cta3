@@ -1908,3 +1908,82 @@ body {
     justify-self: end;
   }
 }
+
+/* trilha de tabuleiro: casas em serpentina, um cartão por casa */
+.track {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lv-border);
+  border-radius: var(--lv-radius-lg);
+  background: var(--lv-surface);
+  box-shadow: var(--lv-shadow);
+}
+.track .board-topline {
+  justify-content: center;
+}
+.track-path {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.track-path polyline {
+  fill: none;
+  stroke: var(--lv-border-strong);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.track-slot,
+.track-card {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-height: 84px;
+  border-radius: var(--lv-radius);
+}
+.track-slot {
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--lv-border-strong);
+  background: var(--lv-surface-2);
+}
+.track-slot-number {
+  font-size: 22px;
+  font-weight: 800;
+  color: #9fb3c8;
+}
+.track-end {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--lv-primary);
+}
+.board-card.track-card {
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  max-width: none;
+  padding: 10px 12px;
+  font-size: 14px;
+  overflow-wrap: normal;
+  hyphens: auto;
+}
+.track .preview-card {
+  z-index: 4;
+}
+@media (max-width: 650px) {
+  .board-card.track-card {
+    min-width: 0;
+    max-width: none;
+    font-size: 13px;
+  }
+}

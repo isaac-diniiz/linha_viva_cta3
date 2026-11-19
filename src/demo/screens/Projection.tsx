@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Board } from "../../components/Board";
+import { TrackBoard } from "../../components/TrackBoard";
 import { useLocalDemo } from "../client";
 import { boardData, Connection, Header } from "../shared";
 
@@ -65,7 +65,7 @@ export function Projection() {
         </span>
       </section>
       {connected && state?.status === "waiting" && <JoinQr code={state.code} />}
-      <Board
+      <TrackBoard
         {...boardData(state)}
         previews={state?.previews ?? {}}
         className="demo-projection-board"

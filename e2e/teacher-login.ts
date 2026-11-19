@@ -21,4 +21,53 @@ export async function openTeacher(page: Page) {
   await page.getByLabel(/^Senha/).fill(testTeacher.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page.getByText(/Conectado como/)).toBeVisible();
+  await restoreDefaults(page);
+}
+
+/**
+ * Recomeça a sessão com as escolhas padrão (Ciclo da água, 1 cartão por
+ * participante, professor participando). O servidor tem uma única turma e
+ * "Reiniciar" preserva essas escolhas, então um teste anterior pode tê-las mudado.
+ */
+export async function restoreDefaults(page: Page) {
+  const reset = page.getByRole("button", { name: "Reiniciar demonstração" });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  await expect(
+    page.getByRole("button", { name: "Iniciar atividade" }),
+  ).toBeEnabled();
+  const water = page.getByRole("radio", { name: /Ciclo da água/ });
+  if (!(await water.isChecked())) {
+    await water.click();
+    await expect(water).toBeChecked();
+  }
+  const perParticipant = page.getByLabel("Cartões por participante");
+  if ((await perParticipant.inputValue()) !== "1") {
+    await perParticipant.selectOption("1");
+    await expect(perParticipant).toHaveValue("1");
+  }
+  const plays = page.getByRole("checkbox", { name: "Participar com cartões" });
+  if (!(await plays.isChecked())) {
+    await plays.click();
+    await expect(plays).toBeChecked();
+  }
+}
+
+/** Ponto da tela no centro de uma casa da trilha (a primeira é 0). */
+export async function slotPoint(page: Page, slot: number) {
+  const track = page.getByTestId("board-track");
+  const box = await track.boundingBox();
+  const data = await track.evaluate((element: HTMLElement) => ({
+    columns: Number(element.dataset.columns),
+    top: Number(element.dataset.top),
+    rowHeight: Number(element.dataset.rowHeight),
+  }));
+  if (!box) throw new Error("Trilha ausente");
+  const row = Math.floor(slot / data.columns);
+  const offset = slot % data.columns;
+  const col = row % 2 === 0 ? offset : data.columns - 1 - offset;
+  return {
+    x: box.x + ((col + 0.5) * box.width) / data.columns,
+    y: box.y + data.top + (row + 0.5) * data.rowHeight,
+  };
 }

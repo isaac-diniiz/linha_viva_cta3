@@ -17,6 +17,8 @@ type Props = {
   onLocalPreview: (preview: Preview | null) => void;
   onPreview: (preview: Preview, event: "move" | "cancel") => void;
   onDrop: (x: number, version: number) => Promise<void>;
+  /** Converte o ponto da tela em posição; sem ele, usa a posição relativa à linha. */
+  locate?: (clientX: number, clientY: number) => Point;
 };
 
 const SEND_INTERVAL_MS = 167;
@@ -29,6 +31,7 @@ export function DragCard({
   onLocalPreview,
   onPreview,
   onDrop,
+  locate: locateOn,
 }: Props) {
   const drag = useRef<{
     id: string;
@@ -43,6 +46,7 @@ export function DragCard({
   const [moving, setMoving] = useState(false);
 
   function locate(event: PointerEvent<HTMLButtonElement>): Point {
+    if (locateOn) return locateOn(event.clientX, event.clientY);
     const rect = boardRef.current?.getBoundingClientRect();
     return normalizedPoint(
       event.clientX,

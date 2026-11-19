@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { DemoSnapshot } from "../client";
 import { useLocalDemo } from "../client";
+import { placeInSlots } from "../../domain/track";
 import { Student } from "./Student";
 
 vi.mock("../client", () => ({ useLocalDemo: vi.fn() }));
@@ -79,11 +80,46 @@ describe("tela do aluno com vários cartões", () => {
     fireEvent.change(screen.getByLabelText(/Cartão para posicionar/), {
       target: { value: "i2" },
     });
-    fireEvent.change(screen.getByRole("slider"), { target: { value: "80" } });
+    // 2 cartões em jogo: a trilha tem 2 casas; a casa 2 fica no centro da 2ª metade
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    expect(screen.getByText("Casa 2 de 2")).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Confirmar posição escolhida" }),
     );
-    await waitFor(() => expect(confirm).toHaveBeenCalledWith("i2", 0.8, 7));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith("i2", 0.75, 7));
+  });
+
+  it("numa casa ocupada, o cartão entra antes do ocupante, que é empurrado", async () => {
+    show({
+      ...snapshot([{ id: "i1", label: "Evaporação" }]),
+      items: [
+        { id: "i1", label: "Evaporação" },
+        { id: "outro", label: "Condensação" },
+      ],
+      cards: [
+        {
+          id: "condensacao",
+          label: "Condensação",
+          votes: 1,
+          total: 1,
+          marks: [0.25],
+        },
+      ],
+      confirmedOrder: ["condensacao"],
+      confirmedPositions: { condensacao: 0.25 },
+    });
+    // a casa 1 está com Condensação
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "1" } });
+    expect(screen.getByText("Casa 1 de 2")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar posição escolhida" }),
+    );
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    const [itemId, position] = confirm.mock.calls[0];
+    expect(itemId).toBe("i1");
+    // o cartão fica com a casa 1 e Condensação é empurrada para a casa 2
+    expect(placeInSlots([position, 0.25], 2)).toEqual([0, 1]);
+    expect(position).toBeLessThan(0.25);
   });
 
   it("com um único cartão, mantém a tela simples, sem escolher o cartão", async () => {

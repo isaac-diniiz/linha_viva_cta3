@@ -3,16 +3,31 @@ import type { Point } from "../domain/axis";
 import { advanceMotion, predictMotion } from "../domain/motion";
 import type { Preview } from "../domain/preview";
 
-type Props = { id: string; label: string; preview: Preview };
+type Props = {
+  id: string;
+  label: string;
+  preview: Preview;
+  /**
+   * Onde desenhar a prévia (x e y de 0 a 1 na tela) a partir das amostras. Sem
+   * ele, as amostras já estão na tela e a previsão segue em linha reta.
+   */
+  predict?: (
+    previous: Preview | null,
+    latest: Preview,
+    elapsedMs: number,
+  ) => Point;
+};
 
-export function AnimatedPreviewCard({ id, label, preview }: Props) {
+export function AnimatedPreviewCard({ id, label, preview, predict }: Props) {
+  const predictRef = useRef(predict ?? predictMotion);
+  predictRef.current = predict ?? predictMotion;
   const cardRef = useRef<HTMLDivElement>(null);
   const sampleRef = useRef({
     previous: null as Preview | null,
     latest: preview,
     arrivedAt: performance.now(),
   });
-  const positionRef = useRef<Point>({ x: preview.x, y: preview.y });
+  const positionRef = useRef<Point>(predictRef.current(null, preview, 0));
   const sizeRef = useRef({ width: 0, height: 0 });
   const drawRef = useRef<() => void>(() => {});
 
@@ -20,7 +35,7 @@ export function AnimatedPreviewCard({ id, label, preview }: Props) {
     const old = sampleRef.current.latest;
     if (preview.dragId !== old.dragId) {
       sampleRef.current.previous = null;
-      positionRef.current = { x: preview.x, y: preview.y };
+      positionRef.current = predictRef.current(null, preview, 0);
     } else if (preview.seq > old.seq) {
       sampleRef.current.previous = old;
     } else {
@@ -64,8 +79,8 @@ export function AnimatedPreviewCard({ id, label, preview }: Props) {
     const tick = (now: number) => {
       const { previous, latest, arrivedAt } = sampleRef.current;
       const target = reducedMotion.matches
-        ? { x: latest.x, y: latest.y }
-        : predictMotion(previous, latest, now - arrivedAt);
+        ? predictRef.current(null, latest, 0)
+        : predictRef.current(previous, latest, now - arrivedAt);
       positionRef.current = reducedMotion.matches
         ? target
         : advanceMotion(
@@ -93,6 +108,7 @@ export function AnimatedPreviewCard({ id, label, preview }: Props) {
       data-sent-at={preview.sentAt}
       data-x={preview.x}
       data-y={preview.y}
+      data-position={predict ? preview.x : undefined}
       style={{ left: 0, top: 0, transition: "none" }}
     >
       <span className="preview-dot" />

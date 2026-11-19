@@ -109,7 +109,8 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
   for (const [index, { page }] of students.entries()) {
     await page
       .getByRole("slider", { name: /Outra forma de posicionar/ })
-      .fill(String(15 + index * 20));
+      // 3 cartões diferentes em jogo: a trilha tem 3 casas
+      .fill(String((index % 3) + 1));
     await page
       .getByRole("button", { name: "Confirmar posição escolhida" })
       .click();
@@ -225,7 +226,8 @@ test("com poucas pessoas, cada participante recebe e posiciona vários cartões"
       await chooser.selectOption({ label });
       await page
         .getByRole("slider", { name: /Outra forma de posicionar/ })
-        .fill(index ? "80" : "20");
+        // professor e aluno recebem os mesmos 2 cartões: a trilha tem 2 casas
+        .fill(index ? "2" : "1");
       await page
         .getByRole("button", { name: "Confirmar posição escolhida" })
         .click();
@@ -364,7 +366,8 @@ test("celular em navegador independente confirma pela alternativa ao arraste", a
   await expect(page.locator(".drag-card")).toBeEnabled();
   await page
     .getByRole("slider", { name: /Outra forma de posicionar/ })
-    .fill("65");
+    // professor e aluno têm Evaporação: a trilha tem uma casa
+    .fill("1");
   await page
     .getByRole("button", { name: "Confirmar posição escolhida" })
     .click();

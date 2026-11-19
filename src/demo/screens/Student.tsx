@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Board } from "../../components/Board";
+import { TrackBoard } from "../../components/TrackBoard";
 import type { Preview } from "../../domain/preview";
+import { slotCenter } from "../../domain/track";
 import { useLocalDemo } from "../client";
 import { INVALID_CODE_MESSAGE } from "../domain";
 import {
@@ -12,6 +13,8 @@ import {
   ownCards,
   placedMessage,
   replacePreview,
+  snapToTrack,
+  trackSlots,
   withLocalPreviews,
 } from "../shared";
 import { JoinCode } from "./JoinCode";
@@ -26,7 +29,7 @@ export function Student({ code }: { code: string }) {
     {},
   );
   const [chosenId, setChosenId] = useState("");
-  const [sliderX, setSliderX] = useState(50);
+  const [chosenSlot, setChosenSlot] = useState(1);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -35,6 +38,8 @@ export function Student({ code }: { code: string }) {
   const cards = ownCards(state);
   const target = cards.find((card) => card.id === chosenId) ?? cards[0];
   const anyShared = cards.some((card) => isSharedCard(state, card.id));
+  const slots = trackSlots(state);
+  const slotNumber = Math.min(chosenSlot, slots);
   const disabled = !connected || !state || state.status !== "active" || busy;
   const setLocalPreview = (itemId: string, preview: Preview | null) =>
     setLocalPreviews((current) => replacePreview(current, itemId, preview));
@@ -46,7 +51,8 @@ export function Student({ code }: { code: string }) {
     setBusy(true);
     setMessage("");
     try {
-      await confirm(itemId, x, version);
+      // o cartão encaixa numa casa da trilha; numa casa ocupada, entra antes
+      await confirm(itemId, snapToTrack(state, itemId, x), version);
       setMessage(placedMessage(isSharedCard(state, itemId)));
     } catch (e) {
       setMessage((e as Error).message);
@@ -90,7 +96,7 @@ export function Student({ code }: { code: string }) {
       <div className="student-layout">
         <section className="student-board-section">
           <div className="section-label">Linha da turma</div>
-          <Board
+          <TrackBoard
             ref={boardRef}
             smoothPreviews={false}
             {...boardData(state)}
@@ -150,17 +156,22 @@ export function Student({ code }: { code: string }) {
               </>
             )}
             <label htmlFor="demo-position-range">
-              Outra forma de posicionar: escolha um ponto na linha
+              Outra forma de posicionar: escolha a casa
             </label>
             <input
               id="demo-position-range"
               type="range"
-              min="0"
-              max="100"
-              value={sliderX}
+              min="1"
+              max={slots}
+              step="1"
+              value={slotNumber}
+              aria-valuetext={`Casa ${slotNumber} de ${slots}`}
               disabled={disabled}
-              onChange={(event) => setSliderX(Number(event.target.value))}
+              onChange={(event) => setChosenSlot(Number(event.target.value))}
             />
+            <div className="slot-choice" aria-hidden="true">
+              Casa {slotNumber} de {slots}
+            </div>
             <div className="range-labels">
               <span>{state?.axis.start ?? "Início"}</span>
               <span>{state?.axis.end ?? "Fim"}</span>
@@ -168,7 +179,10 @@ export function Student({ code }: { code: string }) {
             <button
               className="button secondary full"
               disabled={disabled || !target}
-              onClick={() => target && void place(target.id, sliderX / 100)}
+              onClick={() =>
+                target &&
+                void place(target.id, slotCenter(slotNumber - 1, slots))
+              }
             >
               Confirmar posição escolhida
             </button>
