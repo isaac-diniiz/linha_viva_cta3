@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { slotPoint } from "./teacher-login";
 
 test.skip(
   !process.env.DEMO_MODE,
@@ -104,50 +105,57 @@ test("professor, aluno e projeção compartilham o movimento antes da confirmaç
   await page.getByRole("link", { name: "Professor" }).click();
   await expect(page.getByText("CÓDIGO DA TURMA · DEMO1234")).toBeVisible();
   await page.getByRole("button", { name: "Reiniciar demonstração" }).click();
-
-  const projection = await browser.newPage();
-  await projection.goto("/demo/projetor");
-  const student = await browser.newPage();
-  await student.goto("/demo/aluno/DEMO1234");
-  const card = student.locator(".drag-card");
-  await expect(card).toBeDisabled();
-  await page.getByRole("button", { name: "Iniciar atividade" }).click();
-  await expect(card).toBeEnabled();
-  const start = await card.boundingBox();
-  const board = await student.getByTestId("board-track").boundingBox();
-  if (!start || !board) throw new Error("Caixa ou eixo não encontrado.");
-  await student.mouse.move(
-    start.x + start.width / 2,
-    start.y + start.height / 2,
-  );
-  await student.mouse.down();
-  await student.mouse.move(
-    board.x + board.width * 0.25,
-    board.y + board.height * 0.3,
-    { steps: 8 },
-  );
-  await expect(projection.locator(".preview-card")).toBeVisible();
-  await expect(projection.locator(".confirmed-card")).toHaveCount(0);
-  await student.waitForTimeout(180);
-  await student.mouse.move(
-    board.x + board.width * 0.7,
-    board.y + board.height * 0.6,
-    { steps: 1 },
-  );
-  await expect
-    .poll(async () =>
-      projection.locator(".preview-card").getAttribute("data-x"),
-    )
-    .toBe("0.7");
-  await student.mouse.up();
-  await expect(projection.locator(".confirmed-card")).toBeVisible();
-  await expect(projection.locator(".confirmed-card")).toHaveAttribute(
-    "style",
-    /left: 70%/,
-  );
-  await expect(projection.locator(".preview-card")).toHaveCount(0);
-  await projection.close();
-  await student.close();
+  // 3 cartões por pessoa: a trilha do Ciclo da água fica com 3 casas
+  const perParticipant = page.getByLabel("Cartões por participante");
+  try {
+    await perParticipant.selectOption("3");
+    await expect(perParticipant).toHaveValue("3");
+    const projection = await browser.newPage();
+    await projection.goto("/demo/projetor");
+    const student = await browser.newPage();
+    await student.goto("/demo/aluno/DEMO1234");
+    const card = student.locator(".drag-card").first();
+    await expect(card).toBeDisabled();
+    await page.getByRole("button", { name: "Iniciar atividade" }).click();
+    await expect(card).toBeEnabled();
+    const start = await card.boundingBox();
+    if (!start) throw new Error("Cartão não encontrado.");
+    await student.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2,
+    );
+    await student.mouse.down();
+    const second = await slotPoint(student, 1);
+    await student.mouse.move(second.x, second.y, { steps: 8 });
+    // a projeção recebe a posição na trilha antes de o aluno soltar
+    const preview = projection.locator(".preview-card");
+    await expect(preview).toBeVisible();
+    await expect(projection.locator(".confirmed-card")).toHaveCount(0);
+    await expect
+      .poll(async () => Number(await preview.getAttribute("data-position")))
+      .toBeCloseTo(0.5, 2);
+    await student.waitForTimeout(180);
+    const third = await slotPoint(student, 2);
+    await student.mouse.move(third.x, third.y, { steps: 1 });
+    await expect
+      .poll(async () => Number(await preview.getAttribute("data-position")))
+      .toBeCloseTo(5 / 6, 2);
+    await student.mouse.up();
+    // ao soltar, o cartão encaixa na 3ª casa e a prévia some
+    await expect(projection.locator(".confirmed-card")).toHaveCount(1);
+    await expect(projection.locator(".confirmed-card")).toHaveAttribute(
+      "data-slot",
+      "2",
+    );
+    await expect(projection.locator(".preview-card")).toHaveCount(0);
+    await projection.close();
+    await student.close();
+  } finally {
+    // reiniciar preserva a quantidade: devolve um cartão por participante
+    await page.getByRole("button", { name: "Reiniciar demonstração" }).click();
+    await perParticipant.selectOption("1");
+    await expect(perParticipant).toHaveValue("1");
+  }
 });
 
 test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
@@ -166,16 +174,19 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
   await page.goto("/demo/aluno/DEMO1234");
   const card = page.locator(".drag-card");
   await expect(card).toBeEnabled();
-  await page
-    .getByRole("slider", { name: /Outra forma de posicionar/ })
-    .fill("80");
+  // professor e aluno têm Evaporação: a trilha tem uma casa
+  const slider = page.getByRole("slider", {
+    name: /Outra forma de posicionar/,
+  });
+  await slider.fill("1");
+  await expect(page.getByText("Casa 1 de 1")).toBeVisible();
   await page
     .getByRole("button", { name: "Confirmar posição escolhida" })
     .click();
   await expect(page.getByText("Seu voto foi registrado.")).toBeVisible();
   await expect(page.locator(".confirmed-card")).toHaveAttribute(
-    "style",
-    /left: 80%/,
+    "data-slot",
+    "0",
   );
   await teacher.close();
 });
@@ -200,11 +211,12 @@ test("no celular em pé, caixas confirmadas próximas não se cobrem", async ({
     await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
     const chooser = page.getByLabel("Cartão para posicionar");
     const labels = await chooser.locator("option").allTextContents();
+    // os três cartões são soltos na mesma casa: cada um empurra o anterior
     for (const [index, label] of labels.entries()) {
       await chooser.selectOption({ label });
       await page
         .getByRole("slider", { name: /Outra forma de posicionar/ })
-        .fill(String(45 + index * 5));
+        .fill("2");
       await page
         .getByRole("button", { name: "Confirmar posição escolhida" })
         .click();
@@ -212,6 +224,16 @@ test("no celular em pé, caixas confirmadas próximas não se cobrem", async ({
     }
     const cards = page.locator(".confirmed-card");
     await expect(cards).toHaveCount(3);
+    // cada cartão numa casa diferente da trilha
+    await expect
+      .poll(async () =>
+        (
+          await Promise.all(
+            (await cards.all()).map((card) => card.getAttribute("data-slot")),
+          )
+        ).sort(),
+      )
+      .toEqual(["0", "1", "2"]);
     // espera as faixas se acomodarem antes de medir
     await expect
       .poll(async () => {

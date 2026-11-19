@@ -1,6 +1,8 @@
 import type { RefObject } from "react";
 import { DragCard } from "../components/DragCard";
+import { trackPosition } from "../components/TrackBoard";
 import type { Preview } from "../domain/preview";
+import { dropPosition, slotOf } from "../domain/track";
 import type { DemoSnapshot } from "./client";
 
 export function boardData(state: DemoSnapshot | null) {
@@ -10,7 +12,7 @@ export function boardData(state: DemoSnapshot | null) {
     items: [...cards, ...(state?.items ?? [])],
     order: state?.confirmedOrder ?? [],
     positions: state?.confirmedPositions,
-    cardCount: cards.length,
+    slots: trackSlots(state),
     startLabel: state?.axis.start,
     endLabel: state?.axis.end,
     votes: Object.fromEntries(
@@ -23,6 +25,32 @@ export function boardData(state: DemoSnapshot | null) {
 }
 
 type Card = { id: string; label: string };
+
+/** Casas da trilha: uma por cartão diferente em jogo (nunca menos que os já na linha). */
+export function trackSlots(state: DemoSnapshot | null): number {
+  const labels = new Set((state?.items ?? []).map((item) => item.label));
+  return Math.max(1, labels.size, state?.confirmedOrder.length ?? 0);
+}
+
+/**
+ * Posição enviada ao soltar um cartão perto de `position`: encaixa na casa e,
+ * se ela já tiver outro cartão, entra logo antes dele, que é empurrado.
+ */
+export function snapToTrack(
+  state: DemoSnapshot | null,
+  itemId: string,
+  position: number,
+): number {
+  const slots = trackSlots(state);
+  const ownLabel = state?.items.find((item) => item.id === itemId)?.label;
+  const positions = state?.confirmedPositions ?? {};
+  // os outros cartões da trilha; o próprio cartão sai do lugar antigo ao ser solto
+  const others = (state?.cards ?? [])
+    .filter((card) => card.label !== ownLabel)
+    .map((card) => positions[card.id] ?? 0.5)
+    .sort((a, b) => a - b);
+  return dropPosition(slotOf(position, slots), others, slots);
+}
 
 /** Cartões de quem recebeu o estado, na ordem em que foram entregues. */
 export function ownCards(state: DemoSnapshot | null): Card[] {
@@ -88,6 +116,12 @@ export function OwnCards({
             onLocalPreview={(preview) => onLocalPreview(card.id, preview)}
             onPreview={(preview, event) => onPreview(card.id, preview, event)}
             onDrop={(x, dropVersion) => onDrop(card.id, x, dropVersion)}
+            locate={(clientX, clientY) => ({
+              x: boardRef.current
+                ? trackPosition(boardRef.current, clientX, clientY)
+                : 0.5,
+              y: 0.5,
+            })}
           />
           {placedIds.includes(card.id) && (
             <span className="placed-mark">✓ na linha</span>

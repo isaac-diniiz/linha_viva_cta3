@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Board } from "../../components/Board";
+import { TrackBoard } from "../../components/TrackBoard";
 import { LineCreator } from "../../components/LineCreator";
 import { ThemePicker } from "../../components/ThemePicker";
 import type { Preview } from "../../domain/preview";
@@ -14,6 +14,7 @@ import {
   ownCards,
   placedMessage,
   replacePreview,
+  snapToTrack,
   withLocalPreviews,
 } from "../shared";
 
@@ -309,7 +310,7 @@ export function Teacher({
           {message}
         </div>
       )}
-      <Board
+      <TrackBoard
         ref={boardRef}
         {...boardData(state)}
         previews={withLocalPreviews(state, localPreviews)}
@@ -330,7 +331,7 @@ export function Teacher({
             onPreview={preview}
             onDrop={async (itemId, x, version) => {
               try {
-                await confirm(itemId, x, version);
+                await confirm(itemId, snapToTrack(state, itemId, x), version);
                 setMessage(placedMessage(isSharedCard(state, itemId), true));
               } catch (error) {
                 setMessage((error as Error).message);
