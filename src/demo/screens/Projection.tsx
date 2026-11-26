@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { TrackBoard } from "../../components/TrackBoard";
 import { useLocalDemo } from "../client";
-import { boardData, Connection, Header } from "../shared";
+import {
+  boardData,
+  Connection,
+  Header,
+  ReferencePanel,
+  StatusBadge,
+} from "../shared";
 
 function JoinQr({ code }: { code: string }) {
   const url = `${location.origin}/demo/aluno/${encodeURIComponent(code)}`;
@@ -43,6 +49,18 @@ function JoinQr({ code }: { code: string }) {
   );
 }
 
+/** Depois de iniciar, o QR sai, mas quem chega atrasado ainda vê como entrar. */
+function JoinStrip({ code }: { code: string }) {
+  return (
+    <section className="demo-join-strip" aria-label="Entrar na turma">
+      <span>Chegou agora? Entre em</span>
+      <strong>{location.host}/demo/aluno</strong>
+      <span>e digite o código</span>
+      <strong className="join-code">{code}</strong>
+    </section>
+  );
+}
+
 export function Projection() {
   const { state, connected, error } = useLocalDemo("projection");
   return (
@@ -54,27 +72,31 @@ export function Projection() {
           <h1>{state?.title ?? "Aguardando…"}</h1>
           <p>{state?.instruction}</p>
         </div>
-        <span className="header-tag">
-          {state?.status === "active"
-            ? "EM CONSTRUÇÃO"
-            : state?.status === "paused"
-              ? "PAUSADA"
-              : state?.status === "ended"
-                ? "ENCERRADA"
-                : "AGUARDANDO"}
-        </span>
+        {state && <StatusBadge status={state.status} />}
       </section>
       {connected && state?.status === "waiting" && <JoinQr code={state.code} />}
+      {connected &&
+        (state?.status === "active" || state?.status === "paused") && (
+          <JoinStrip code={state.code} />
+        )}
+      {state?.status === "ended" && (
+        <section className="closing-panel" aria-label="Fechamento">
+          <h2>Linha final da turma</h2>
+          <p>
+            Obrigado pela participação! Agora vamos conversar sobre as escolhas
+            da turma.
+          </p>
+        </section>
+      )}
+      {/* acima da trilha: embaixo, a referência ficava fora da tela do projetor */}
+      {state?.revealed && state.reference && (
+        <ReferencePanel labels={state.reference} />
+      )}
       <TrackBoard
         {...boardData(state)}
         previews={state?.previews ?? {}}
         className="demo-projection-board"
       />
-      {state?.revealed && (
-        <div className="notice" role="status">
-          Sequência de referência: {state.reference?.join(" → ")}
-        </div>
-      )}
     </main>
   );
 }

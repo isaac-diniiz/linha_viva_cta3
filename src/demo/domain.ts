@@ -128,6 +128,17 @@ export function referenceLabels(state: DemoState): string[] {
     .map((card) => (card.year ? `${card.label} (${card.year})` : card.label));
 }
 
+/**
+ * Texto de cada cartão em jogo, na ordem certa e sem o ano: a casa certa de um
+ * cartão é a posição dele nesta lista. Só é enviada depois de revelar.
+ */
+export function answerLabels(state: DemoState): string[] {
+  const present = new Set(state.items.map((item) => item.templateId));
+  return state.theme.cards
+    .filter((card) => present.has(card.id))
+    .map((card) => card.label);
+}
+
 /** Cartões por pessoa de fato entregues: ninguém recebe o mesmo cartão duas vezes. */
 function handSize(state: Pick<DemoState, "cardsPerParticipant" | "deck">) {
   return Math.min(state.cardsPerParticipant, state.deck.length);

@@ -1672,12 +1672,13 @@ body {
   min-height: 64px;
 }
 .placed-mark {
-  position: absolute;
-  top: 8px;
-  right: 10px;
+  /* abaixo do cartão, sem cobrir o nome dele */
+  display: inline-block;
+  margin-top: 6px;
   padding: 2px 9px;
+  border: 1px solid var(--lv-success);
   border-radius: 999px;
-  background: var(--lv-surface);
+  background: var(--lv-success-soft);
   color: var(--lv-success);
   font-size: 12px;
   font-weight: 800;
@@ -1986,4 +1987,180 @@ body {
     max-width: none;
     font-size: 13px;
   }
+}
+
+/* Projeção legível em sala: estado, entrada tardia e referência revelada */
+.projection-status {
+  flex: none;
+  padding: 10px 20px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  font-size: clamp(18px, 1.8vw, 28px);
+  font-weight: 800;
+  background: var(--lv-surface);
+  color: var(--lv-ink-2);
+}
+.projection-status.status-active {
+  background: var(--lv-success-soft);
+  color: var(--lv-success);
+}
+.projection-status.status-paused {
+  background: var(--lv-warning-soft);
+  color: var(--lv-warning);
+}
+.projection-status.status-waiting {
+  background: var(--lv-primary-soft);
+  color: var(--lv-primary);
+}
+.demo-join-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px 10px;
+  margin: 0 0 16px;
+  padding: 10px 18px;
+  border: 1px solid var(--lv-border);
+  border-radius: var(--lv-radius);
+  background: var(--lv-surface);
+  color: var(--lv-ink-2);
+  font-size: clamp(16px, 1.5vw, 24px);
+}
+.demo-join-strip strong {
+  color: var(--lv-ink);
+}
+.demo-join-strip .join-code {
+  color: var(--lv-primary);
+  font-size: 1.3em;
+  letter-spacing: 0.08em;
+}
+.projection-reference {
+  margin: 0 0 16px;
+  padding: 16px 20px;
+  border: 2px solid var(--lv-success);
+  border-radius: var(--lv-radius-lg);
+  background: var(--lv-success-soft);
+}
+.projection-reference h2 {
+  margin: 0 0 12px;
+  color: var(--lv-success);
+  font-size: clamp(18px, 1.6vw, 26px);
+}
+.projection-reference ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.projection-reference li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid #b9e0c9;
+  border-radius: var(--lv-radius);
+  background: var(--lv-surface);
+  color: var(--lv-ink);
+  font-size: clamp(16px, 1.5vw, 24px);
+  font-weight: 700;
+}
+.projection-reference .reference-step {
+  display: grid;
+  place-items: center;
+  min-width: 1.8em;
+  height: 1.8em;
+  border-radius: 999px;
+  background: var(--lv-success);
+  color: #fff;
+  font-size: 0.85em;
+}
+
+/* Painel do professor: preparação recolhível e confirmações */
+.teacher-setup {
+  margin: 0 0 16px;
+  padding: 0 16px;
+  border: 1px solid var(--lv-border);
+  border-radius: var(--lv-radius);
+  background: var(--lv-surface);
+}
+.teacher-setup > summary {
+  padding: 12px 0;
+  font-weight: 700;
+  color: var(--lv-ink);
+  cursor: pointer;
+}
+.teacher-setup[open] {
+  padding-bottom: 16px;
+}
+.confirm-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--lv-warning);
+  border-radius: var(--lv-radius);
+  background: var(--lv-warning-soft);
+  color: var(--lv-ink);
+  font-weight: 600;
+}
+.confirm-bar > span {
+  flex: 1 1 280px;
+}
+
+/* Fechamento ao encerrar (aluno e projeção) */
+.closing-panel {
+  margin: 0 0 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--lv-border-strong);
+  border-radius: var(--lv-radius-lg);
+  background: var(--lv-primary-soft);
+  color: var(--lv-ink);
+}
+.closing-panel h2 {
+  margin: 0 0 6px;
+  color: var(--lv-primary);
+  font-size: clamp(20px, 2vw, 30px);
+}
+.closing-panel p {
+  margin: 0;
+  font-size: clamp(16px, 1.5vw, 24px);
+  line-height: 1.5;
+}
+
+/* Revelação comparada: casa certa de cada cartão e resultado do aluno */
+.track-card.in-place {
+  border-color: var(--lv-success);
+  box-shadow: 0 0 0 2px var(--lv-success-soft);
+}
+.track-card.out-of-place {
+  border: 2px dashed var(--lv-warning);
+  background: var(--lv-warning-soft);
+}
+.answer-check {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8em;
+  font-weight: 800;
+}
+.track-card.in-place .answer-check {
+  color: var(--lv-success);
+}
+.track-card.out-of-place .answer-check {
+  color: var(--lv-warning);
+}
+.own-result {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--lv-border-strong);
+  border-radius: var(--lv-radius);
+  background: var(--lv-surface);
+}
+.own-result ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
 }

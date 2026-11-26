@@ -2,7 +2,7 @@ import type { RefObject } from "react";
 import { DragCard } from "../components/DragCard";
 import { trackPosition } from "../components/TrackBoard";
 import type { Preview } from "../domain/preview";
-import { dropPosition, slotOf } from "../domain/track";
+import { dropPosition, placeInSlots, slotOf } from "../domain/track";
 import type { DemoSnapshot } from "./client";
 
 export function boardData(state: DemoSnapshot | null) {
@@ -15,6 +15,7 @@ export function boardData(state: DemoSnapshot | null) {
     slots: trackSlots(state),
     startLabel: state?.axis.start,
     endLabel: state?.axis.end,
+    answer: answerByCard(state),
     votes: Object.fromEntries(
       cards.map((card) => [
         card.id,
@@ -25,6 +26,48 @@ export function boardData(state: DemoSnapshot | null) {
 }
 
 type Card = { id: string; label: string };
+
+/** Casa certa de cada cartão da linha, pelo texto do cartão; só depois de revelar. */
+function answerByCard(
+  state: DemoSnapshot | null,
+): Record<string, number> | undefined {
+  if (!state?.revealed || !state.answer) return undefined;
+  const answer = state.answer;
+  return Object.fromEntries(
+    state.cards.flatMap((card) => {
+      const slot = answer.indexOf(card.label);
+      return slot < 0 ? [] : [[card.id, slot]];
+    }),
+  );
+}
+
+/**
+ * Onde cada cartão do participante ficou e qual é a casa certa, em texto, para
+ * ele ver no próprio celular depois de revelar. Lista vazia antes disso.
+ */
+export function ownResults(state: DemoSnapshot | null): string[] {
+  if (!state?.revealed || !state.answer) return [];
+  const slots = placeInSlots(
+    state.confirmedOrder.map((id) => state.confirmedPositions[id] ?? 0.5),
+    trackSlots(state),
+  );
+  return ownCards(state).flatMap((card) => {
+    const correct = state.answer!.indexOf(card.label);
+    if (correct < 0) return [];
+    const onLine = state.cards.find((line) => line.label === card.label);
+    const index = onLine ? state.confirmedOrder.indexOf(onLine.id) : -1;
+    if (index < 0)
+      return [
+        `${card.label}: não foi para a linha; a casa certa é a ${correct + 1}.`,
+      ];
+    const placed = slots[index];
+    return [
+      placed === correct
+        ? `${card.label}: ✓ na casa certa (${correct + 1}).`
+        : `${card.label}: ficou na casa ${placed + 1}; a casa certa é a ${correct + 1}.`,
+    ];
+  });
+}
 
 /** Casas da trilha: uma por cartão diferente em jogo (nunca menos que os já na linha). */
 export function trackSlots(state: DemoSnapshot | null): number {
@@ -184,5 +227,45 @@ export function Connection({
         </div>
       )}
     </>
+  );
+}
+
+const STATUS_LABELS = {
+  waiting: "Aguardando início",
+  active: "Em construção",
+  paused: "Pausada",
+  ended: "Encerrada",
+} as const;
+
+/** Estado da atividade em destaque, com texto e não só cor. */
+export function StatusBadge({ status }: { status: DemoSnapshot["status"] }) {
+  return (
+    <span
+      className={`projection-status status-${status}`}
+      role="status"
+      aria-label="Estado da atividade"
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+/** Sequência de referência numerada, mostrada acima da trilha ao revelar. */
+export function ReferencePanel({ labels }: { labels: string[] }) {
+  return (
+    <section
+      className="projection-reference"
+      aria-label="Sequência de referência"
+    >
+      <h2>Sequência de referência</h2>
+      <ol>
+        {labels.map((label, index) => (
+          <li key={`${index}-${label}`}>
+            <span className="reference-step">{index + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

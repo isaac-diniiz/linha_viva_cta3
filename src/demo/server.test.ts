@@ -15,7 +15,9 @@ type Message = {
   requestId?: string;
   ok?: boolean;
   state?: {
+    code: string;
     status: string;
+    answer?: string[];
     version: number;
     cardsPerParticipant: number;
     teacherPlays: boolean;
@@ -177,5 +179,49 @@ describe("servidor da demonstração", () => {
       `lv_professor=${token}`,
     );
     expect(teacher.received.at(-1)?.type).toBe("snapshot");
+  });
+
+  it("nova rodada mantém o código da turma; depois de encerrar, gera outro", async () => {
+    const { port } = await start(true);
+    const token = signSession({ email: "ana@escola.br" }, SECRET, Date.now());
+    const teacher = await connect(
+      port,
+      { role: "teacher" },
+      `lv_professor=${token}`,
+    );
+    const latest = () =>
+      [...teacher.received].reverse().find((m) => m.type === "snapshot")?.state;
+    const first = latest()!.code;
+    const send = (message: unknown) =>
+      teacher.socket.send(JSON.stringify(message));
+    send({ type: "status", status: "active" });
+    await expect.poll(() => latest()?.status).toBe("active");
+    send({ type: "reset" });
+    await expect.poll(() => latest()?.status).toBe("waiting");
+    expect(latest()?.code).toBe(first);
+    send({ type: "status", status: "ended" });
+    await expect.poll(() => latest()?.status).toBe("ended");
+    send({ type: "reset" });
+    await expect.poll(() => latest()?.status).toBe("waiting");
+    expect(latest()?.code).not.toBe(first);
+  });
+
+  it("a resposta para comparar só chega depois de revelar, para todos os papéis", async () => {
+    const { code, port } = await start();
+    const teacher = await connect(port, { role: "teacher" });
+    const student = await connect(port, {
+      role: "student",
+      code,
+      token: "aluno-resposta-1",
+    });
+    const latest = (received: Message[]) =>
+      [...received].reverse().find((m) => m.type === "snapshot")?.state;
+    expect(latest(teacher.received)?.answer).toBeUndefined();
+    expect(latest(student.received)?.answer).toBeUndefined();
+    teacher.socket.send(JSON.stringify({ type: "reveal" }));
+    await expect
+      .poll(() => latest(student.received)?.answer)
+      .toEqual(["Evaporação"]);
+    expect(latest(teacher.received)?.answer).toEqual(["Evaporação"]);
   });
 });

@@ -24,6 +24,7 @@ import {
   INVALID_CODE_MESSAGE,
   lineCards,
   listThemes,
+  answerLabels,
   ownedItems,
   referenceLabels,
   resolveOwnItem,
@@ -116,9 +117,15 @@ export function attachDemoServer(
     lines.source === "arquivos",
   );
   const projectionKey = randomBytes(24).toString("hex");
-  const newState = (selected: Theme = catalog.initial, deal?: Deal) => {
+  const newState = (
+    selected: Theme = catalog.initial,
+    deal?: Deal,
+    keepCode?: string,
+  ) => {
     const result = createDemoState(selected, Math.random, deal);
-    if (publicMode) result.code = randomBytes(4).toString("hex").toUpperCase();
+    if (keepCode) result.code = keepCode;
+    else if (publicMode)
+      result.code = randomBytes(4).toString("hex").toUpperCase();
     return result;
   };
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16_384 });
@@ -189,6 +196,8 @@ export function attachDemoServer(
         client.role === "teacher" || state.revealed
           ? referenceLabels(state)
           : undefined,
+      // para comparar cada cartão com a casa certa; só depois de revelar
+      answer: state.revealed ? answerLabels(state) : undefined,
       cardsPerParticipant: state.cardsPerParticipant,
       teacherPlays: state.teacherPlays,
       ownItemIds: own,
@@ -497,7 +506,12 @@ export function attachDemoServer(
         } else if (message.type === "cardsPerParticipant") {
           state = setCardsPerParticipant(state, Number(message.value));
         } else if (message.type === "reset") {
-          state = newState(state.theme, dealOf(state));
+          // nova rodada da mesma turma mantém o código; depois de encerrar, vem outra turma
+          state = newState(
+            state.theme,
+            dealOf(state),
+            state.status === "ended" ? undefined : state.code,
+          );
           for (const connected of clients.values())
             if (connected.role === "student" && connected.token)
               assignStudent(state, connected.token);

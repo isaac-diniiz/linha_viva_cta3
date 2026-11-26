@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { DemoSnapshot } from "../client";
 import { useLocalDemo } from "../client";
@@ -145,7 +145,7 @@ describe("painel do professor: criar linha", () => {
     expect(screen.getByRole("button", { name: "Criar linha" })).toBeDisabled();
     expect(
       screen.getByText(/Só dá para criar uma linha antes de iniciar/),
-    ).toBeVisible();
+    ).toBeInTheDocument();
   });
 });
 
@@ -271,5 +271,139 @@ describe("painel do professor: editar e apagar linhas criadas", () => {
     expect(
       screen.getByRole("button", { name: "Apagar Fases da escola" }),
     ).toBeDisabled();
+  });
+});
+
+describe("painel do professor: conduzir a aula sem perder a turma", () => {
+  const send = vi.fn();
+  const confirm = vi.fn();
+  beforeEach(() => {
+    send.mockReset();
+    confirm.mockReset().mockResolvedValue(undefined);
+  });
+  function show(state: DemoSnapshot) {
+    (useLocalDemo as Mock).mockReturnValue({
+      state,
+      connected: true,
+      error: "",
+      send,
+      confirm,
+      preview: vi.fn(),
+    });
+    render(<Teacher />);
+  }
+
+  /** Arrasta o cartão do professor e o solta sobre a trilha. */
+  function dropOwnCard() {
+    const card = screen.getByRole("button", { name: /Arrastar Evaporação/ });
+    card.setPointerCapture = vi.fn();
+    fireEvent.pointerDown(card, { pointerId: 1, clientX: 20, clientY: 20 });
+    fireEvent.pointerMove(card, { pointerId: 1, clientX: 40, clientY: 30 });
+    fireEvent.pointerUp(card, { pointerId: 1, clientX: 40, clientY: 30 });
+  }
+
+  it("Encerrar pede confirmação e dá para desistir", () => {
+    show(snapshot({ status: "active" }));
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar" }));
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByText(/Encerrar a atividade\?/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar a aula" }));
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Encerrar a atividade\?/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Encerrar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sim, encerrar" }));
+    expect(send).toHaveBeenCalledWith({ type: "status", status: "ended" });
+  });
+
+  it("Nova rodada pede confirmação, avisa que a linha será apagada e mantém o código", () => {
+    show(snapshot({ status: "active" }));
+    expect(
+      screen.queryByRole("button", { name: /Reiniciar demonstração/ }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Nova rodada" }));
+    expect(send).not.toHaveBeenCalled();
+    expect(screen.getByText(/linha atual será apagada/)).toBeVisible();
+    expect(screen.getByText(/código da turma continua o mesmo/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Sim, nova rodada" }));
+    expect(send).toHaveBeenCalledWith({ type: "reset" });
+  });
+
+  it("depois de encerrar, a nova rodada avisa que a turma recebe outro código", () => {
+    show(snapshot({ status: "ended" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nova rodada" }));
+    expect(screen.getByText(/código novo/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("mostra o estado da atividade em destaque", () => {
+    show(snapshot({ status: "paused" }));
+    expect(
+      screen.getByRole("status", { name: "Estado da atividade" }),
+    ).toHaveTextContent("Pausada");
+  });
+
+  it("a preparação fica aberta antes de iniciar e recolhida depois, sem empurrar a trilha", () => {
+    show(snapshot({ status: "waiting" }));
+    const setup = () =>
+      screen.getByText("Preparação da atividade").closest("details")!;
+    expect(setup()).toHaveAttribute("open");
+    expect(
+      screen.getByRole("checkbox", { name: "Participar com cartões" }),
+    ).toBeVisible();
+  });
+
+  it("depois de iniciar, a preparação começa recolhida", () => {
+    show(snapshot({ status: "active" }));
+    const setup = screen
+      .getByText("Preparação da atividade")
+      .closest("details")!;
+    expect(setup).not.toHaveAttribute("open");
+    expect(
+      screen.getByRole("checkbox", { name: "Participar com cartões" }),
+    ).not.toBeVisible();
+  });
+
+  it("confirmação de cartão aparece como sucesso, não como erro", async () => {
+    show(snapshot({ status: "active", version: 2 }));
+    dropOwnCard();
+    await waitFor(() => expect(confirm).toHaveBeenCalled());
+    const notice = await screen.findByText(/foi colocado na linha/);
+    expect(notice).not.toHaveClass("error");
+    expect(notice).toHaveAttribute("role", "status");
+  });
+
+  it("erro do servidor continua como alerta", async () => {
+    confirm.mockRejectedValueOnce(new Error("A linha mudou. Tente de novo."));
+    show(snapshot({ status: "active", version: 2 }));
+    dropOwnCard();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("A linha mudou");
+    expect(alert).toHaveClass("error");
+  });
+
+  it("a referência revelada aparece acima da trilha", () => {
+    const { container } = (() => {
+      (useLocalDemo as Mock).mockReturnValue({
+        state: snapshot({
+          status: "paused",
+          revealed: true,
+          reference: ["Evaporação", "Condensação"],
+        }),
+        connected: true,
+        error: "",
+        send,
+        confirm,
+        preview: vi.fn(),
+      });
+      return render(<Teacher />);
+    })();
+    const panel = screen.getByRole("region", {
+      name: "Sequência de referência",
+    });
+    const board = container.querySelector(".track-scroll")!;
+    expect(
+      panel.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

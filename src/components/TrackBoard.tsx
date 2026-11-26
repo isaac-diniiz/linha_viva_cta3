@@ -29,6 +29,8 @@ type Props = {
   previews: PreviewState;
   className?: string;
   smoothPreviews?: boolean;
+  /** Casa certa (a partir de 0) de cada cartão; só depois de revelar. */
+  answer?: Record<string, number>;
 };
 
 /**
@@ -73,6 +75,7 @@ export const TrackBoard = forwardRef<HTMLDivElement, Props>(function TrackBoard(
     previews,
     className = "",
     smoothPreviews = true,
+    answer,
   },
   ref,
 ) {
@@ -170,16 +173,31 @@ export const TrackBoard = forwardRef<HTMLDivElement, Props>(function TrackBoard(
         )}
         {order.map((id, index) => {
           const cell = slotCell(placed[index], columns);
+          const correct = answer?.[id];
+          // na revelação, o texto diz se o cartão está na casa certa: não depende só da cor
+          const check =
+            correct === undefined
+              ? ""
+              : correct === placed[index]
+                ? " in-place"
+                : " out-of-place";
           return (
             <div
               key={id}
-              className="board-card confirmed-card track-card"
+              className={`board-card confirmed-card track-card${check}`}
               data-testid={`confirmed-${id}`}
               data-slot={placed[index]}
               style={{ left: left(cell), top: top(cell), width: cardWidth }}
             >
               <span className="card-index">{placed[index] + 1}</span>
               <span>{labels.get(id) ?? "Item"}</span>
+              {correct !== undefined && (
+                <span className="answer-check">
+                  {correct === placed[index]
+                    ? "✓ casa certa"
+                    : `Casa certa: ${correct + 1}`}
+                </span>
+              )}
               {votes?.[id] && votes[id].total > 1 && (
                 <span className="vote-count">
                   {votes[id].votes} de {votes[id].total} votaram
