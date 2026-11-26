@@ -74,8 +74,8 @@ export function ThemePicker({ themes, selectedId, disabled, onChoose }: Props) {
       ))}
       {disabled && (
         <p className="small-help">
-          O tema fica travado depois de iniciar. Use Reiniciar demonstração para
-          escolher outro.
+          O tema fica travado depois de iniciar. Use Nova rodada para escolher
+          outro.
         </p>
       )}
     </fieldset>

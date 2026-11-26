@@ -13,8 +13,10 @@ import {
   OwnCards,
   ownCards,
   placedMessage,
+  ReferencePanel,
   replacePreview,
   snapToTrack,
+  StatusBadge,
   withLocalPreviews,
 } from "../shared";
 
@@ -31,7 +33,13 @@ export function Teacher({
 } = {}) {
   const { state, connected, error, send, confirm, preview } =
     useLocalDemo("teacher");
-  const [message, setMessage] = useState("");
+  // sucesso em verde (status), erro em vermelho (alerta)
+  const [message, setMessage] = useState<{
+    text: string;
+    tone: "ok" | "error";
+  } | null>(null);
+  // Encerrar e Nova rodada apagam a aula: pedem confirmação antes
+  const [confirming, setConfirming] = useState<"end" | "reset" | null>(null);
   const [localPreviews, setLocalPreviews] = useState<Record<string, Preview>>(
     {},
   );
@@ -50,9 +58,9 @@ export function Teacher({
   const action = (payload: unknown) => {
     try {
       send(payload);
-      setMessage("");
+      setMessage(null);
     } catch (e) {
-      setMessage((e as Error).message);
+      setMessage({ text: (e as Error).message, tone: "error" });
     }
   };
   return (
@@ -81,6 +89,7 @@ export function Teacher({
           </div>
           <h1>{state?.title ?? "Preparando atividade…"}</h1>
         </div>
+        {state && <StatusBadge status={state.status} />}
         <a
           className="button secondary"
           href={`/demo/projetor?key=${encodeURIComponent(state?.projectionKey ?? "")}`}
@@ -99,168 +108,178 @@ export function Teacher({
           . {state.memberCount} aluno(s) conectado(s).
         </div>
       )}
-      {state?.themes && (
-        <ThemePicker
-          themes={state.themes}
-          selectedId={state.themeId}
-          disabled={!connected || state.status !== "waiting"}
-          onChoose={(themeId) => action({ type: "theme", themeId })}
-        />
-      )}
-      {state?.themes && (
-        <div className="line-creator-bar">
-          <button
-            type="button"
-            className="button secondary"
-            aria-expanded={waiting && lineForm !== null && !lineForm.editId}
-            disabled={!connected || !waiting}
-            onClick={() => setLineForm({})}
-          >
-            Criar linha
-          </button>
-          <span className="small-help">
-            {waiting
-              ? "Monte uma linha com o seu tema, as pontas e os cartões."
-              : "Só dá para criar uma linha antes de iniciar. Use Reiniciar demonstração para criar outra."}
-          </span>
-        </div>
-      )}
-      {state?.themes && customLines.length > 0 && (
-        <section className="custom-lines">
-          <div className="section-label">Suas linhas criadas</div>
-          <ul>
-            {customLines.map((line) => (
-              <li key={line.id}>
-                <span className="custom-line-title">{line.titulo}</span>
-                <span className="small-help">
-                  {line.cartoes.length} cartões · {line.inicio} → {line.fim}
-                </span>
-                {confirmDeleteId === line.id ? (
-                  <span className="custom-line-actions">
-                    <span className="small-help">
-                      Apagar esta linha? Isso não pode ser desfeito.
-                    </span>
-                    <button
-                      type="button"
-                      className="button danger"
-                      disabled={!connected || !waiting}
-                      onClick={() => {
-                        setConfirmDeleteId(null);
-                        if (lineForm?.editId === line.id) setLineForm(null);
-                        action({ type: "deleteTheme", id: line.id });
-                      }}
-                    >
-                      Sim, apagar
-                    </button>
-                    <button
-                      type="button"
-                      className="button subtle"
-                      onClick={() => setConfirmDeleteId(null)}
-                    >
-                      Não apagar
-                    </button>
-                  </span>
-                ) : (
-                  <span className="custom-line-actions">
-                    <button
-                      type="button"
-                      className="button secondary"
-                      aria-label={`Editar ${line.titulo}`}
-                      disabled={!connected || !waiting}
-                      onClick={() => {
-                        setConfirmDeleteId(null);
-                        setLineForm({ editId: line.id });
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="button subtle"
-                      aria-label={`Apagar ${line.titulo}`}
-                      disabled={!connected || !waiting}
-                      onClick={() => setConfirmDeleteId(line.id)}
-                    >
-                      Apagar
-                    </button>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {!waiting && (
-            <p className="small-help">
-              Só dá para editar ou apagar uma linha antes de iniciar.
-            </p>
-          )}
-        </section>
-      )}
-      {state?.themes &&
-        waiting &&
-        lineForm &&
-        (!lineForm.editId || editedLine) && (
-          <LineCreator
-            key={lineForm.editId ?? "nova"}
-            storage={state.linesStorage}
-            savedKey={
-              lineForm.editId ? JSON.stringify(editedLine) : state.themes.length
-            }
-            editing={editedLine && { id: editedLine.id, form: editedLine }}
-            onSubmit={(line) =>
-              action(
-                lineForm.editId
-                  ? { type: "updateTheme", id: lineForm.editId, line }
-                  : { type: "createTheme", line },
-              )
-            }
-            onClose={() => setLineForm(null)}
+      <details
+        // reabre sozinho ao voltar a aguardar; depois de iniciar começa recolhido
+        key={waiting ? "preparando" : "em-aula"}
+        className="teacher-setup"
+        open={waiting}
+      >
+        <summary>Preparação da atividade</summary>
+        {state?.themes && (
+          <ThemePicker
+            themes={state.themes}
+            selectedId={state.themeId}
+            disabled={!connected || state.status !== "waiting"}
+            onChoose={(themeId) => action({ type: "theme", themeId })}
           />
         )}
-      {state && (
-        <div className="cards-per-participant">
-          <label className="teacher-plays">
-            <input
-              type="checkbox"
-              checked={state.teacherPlays}
+        {state?.themes && (
+          <div className="line-creator-bar">
+            <button
+              type="button"
+              className="button secondary"
+              aria-expanded={waiting && lineForm !== null && !lineForm.editId}
+              disabled={!connected || !waiting}
+              onClick={() => setLineForm({})}
+            >
+              Criar linha
+            </button>
+            <span className="small-help">
+              {waiting
+                ? "Monte uma linha com o seu tema, as pontas e os cartões."
+                : "Só dá para criar uma linha antes de iniciar. Use Nova rodada para criar outra."}
+            </span>
+          </div>
+        )}
+        {state?.themes && customLines.length > 0 && (
+          <section className="custom-lines">
+            <div className="section-label">Suas linhas criadas</div>
+            <ul>
+              {customLines.map((line) => (
+                <li key={line.id}>
+                  <span className="custom-line-title">{line.titulo}</span>
+                  <span className="small-help">
+                    {line.cartoes.length} cartões · {line.inicio} → {line.fim}
+                  </span>
+                  {confirmDeleteId === line.id ? (
+                    <span className="custom-line-actions">
+                      <span className="small-help">
+                        Apagar esta linha? Isso não pode ser desfeito.
+                      </span>
+                      <button
+                        type="button"
+                        className="button danger"
+                        disabled={!connected || !waiting}
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          if (lineForm?.editId === line.id) setLineForm(null);
+                          action({ type: "deleteTheme", id: line.id });
+                        }}
+                      >
+                        Sim, apagar
+                      </button>
+                      <button
+                        type="button"
+                        className="button subtle"
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        Não apagar
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="custom-line-actions">
+                      <button
+                        type="button"
+                        className="button secondary"
+                        aria-label={`Editar ${line.titulo}`}
+                        disabled={!connected || !waiting}
+                        onClick={() => {
+                          setConfirmDeleteId(null);
+                          setLineForm({ editId: line.id });
+                        }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="button subtle"
+                        aria-label={`Apagar ${line.titulo}`}
+                        disabled={!connected || !waiting}
+                        onClick={() => setConfirmDeleteId(line.id)}
+                      >
+                        Apagar
+                      </button>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!waiting && (
+              <p className="small-help">
+                Só dá para editar ou apagar uma linha antes de iniciar.
+              </p>
+            )}
+          </section>
+        )}
+        {state?.themes &&
+          waiting &&
+          lineForm &&
+          (!lineForm.editId || editedLine) && (
+            <LineCreator
+              key={lineForm.editId ?? "nova"}
+              storage={state.linesStorage}
+              savedKey={
+                lineForm.editId
+                  ? JSON.stringify(editedLine)
+                  : state.themes.length
+              }
+              editing={editedLine && { id: editedLine.id, form: editedLine }}
+              onSubmit={(line) =>
+                action(
+                  lineForm.editId
+                    ? { type: "updateTheme", id: lineForm.editId, line }
+                    : { type: "createTheme", line },
+                )
+              }
+              onClose={() => setLineForm(null)}
+            />
+          )}
+        {state && (
+          <div className="cards-per-participant">
+            <label className="teacher-plays">
+              <input
+                type="checkbox"
+                checked={state.teacherPlays}
+                disabled={!connected || state.status !== "waiting"}
+                onChange={(event) =>
+                  action({ type: "teacherPlays", value: event.target.checked })
+                }
+              />
+              Participar com cartões
+            </label>
+            <label htmlFor="demo-cards-per-participant">
+              Cartões por participante
+            </label>
+            <select
+              id="demo-cards-per-participant"
+              value={state.cardsPerParticipant}
               disabled={!connected || state.status !== "waiting"}
               onChange={(event) =>
-                action({ type: "teacherPlays", value: event.target.checked })
+                action({
+                  type: "cardsPerParticipant",
+                  value: Number(event.target.value),
+                })
               }
-            />
-            Participar com cartões
-          </label>
-          <label htmlFor="demo-cards-per-participant">
-            Cartões por participante
-          </label>
-          <select
-            id="demo-cards-per-participant"
-            value={state.cardsPerParticipant}
-            disabled={!connected || state.status !== "waiting"}
-            onChange={(event) =>
-              action({
-                type: "cardsPerParticipant",
-                value: Number(event.target.value),
-              })
-            }
-          >
-            {Array.from(
-              { length: MAX_CARDS_PER_PARTICIPANT },
-              (_, index) => index + 1,
-            ).map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </select>
-          <p className="small-help">
-            Com poucas pessoas, aumente para cobrir a linha toda.{" "}
-            {state.teacherPlays
-              ? "Você também recebe essa quantidade."
-              : "Você só conduz: todos os cartões vão para os alunos."}{" "}
-            Só muda antes de iniciar.
-          </p>
-        </div>
-      )}
+            >
+              {Array.from(
+                { length: MAX_CARDS_PER_PARTICIPANT },
+                (_, index) => index + 1,
+              ).map((count) => (
+                <option key={count} value={count}>
+                  {count}
+                </option>
+              ))}
+            </select>
+            <p className="small-help">
+              Com poucas pessoas, aumente para cobrir a linha toda.{" "}
+              {state.teacherPlays
+                ? "Você também recebe essa quantidade."
+                : "Você só conduz: todos os cartões vão para os alunos."}{" "}
+              Só muda antes de iniciar.
+            </p>
+          </div>
+        )}
+      </details>
       <div className="demo-controls">
         <button
           className="button primary"
@@ -293,22 +312,93 @@ export function Teacher({
         <button
           className="button secondary"
           disabled={!connected || state?.status === "ended"}
-          onClick={() => action({ type: "status", status: "ended" })}
+          onClick={() => setConfirming("end")}
         >
           Encerrar
         </button>
         <button
           className="button secondary"
           disabled={!connected}
-          onClick={() => action({ type: "reset" })}
+          onClick={() => setConfirming("reset")}
         >
-          Reiniciar demonstração
+          Nova rodada
         </button>
       </div>
-      {message && (
-        <div className="notice error" role="alert">
-          {message}
+      {confirming === "end" && (
+        <div
+          className="confirm-bar"
+          role="group"
+          aria-label="Confirmar encerramento"
+        >
+          <span>
+            Encerrar a atividade? Os alunos não poderão mais mover os cartões.
+          </span>
+          <button
+            type="button"
+            className="button danger"
+            disabled={!connected}
+            onClick={() => {
+              setConfirming(null);
+              action({ type: "status", status: "ended" });
+            }}
+          >
+            Sim, encerrar
+          </button>
+          <button
+            type="button"
+            className="button subtle"
+            onClick={() => setConfirming(null)}
+          >
+            Continuar a aula
+          </button>
         </div>
+      )}
+      {confirming === "reset" && (
+        <div
+          className="confirm-bar"
+          role="group"
+          aria-label="Confirmar nova rodada"
+        >
+          <span>
+            Começar uma nova rodada? A linha atual será apagada e todos recebem
+            cartões novos.{" "}
+            {state?.status === "ended"
+              ? "Como a atividade foi encerrada, a turma recebe um código novo: confira na projeção."
+              : "O código da turma continua o mesmo."}
+          </span>
+          <button
+            type="button"
+            className="button danger"
+            disabled={!connected}
+            onClick={() => {
+              setConfirming(null);
+              action({ type: "reset" });
+            }}
+          >
+            Sim, nova rodada
+          </button>
+          <button
+            type="button"
+            className="button subtle"
+            onClick={() => setConfirming(null)}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+      {message &&
+        (message.tone === "error" ? (
+          <div className="notice error" role="alert">
+            {message.text}
+          </div>
+        ) : (
+          <div className="notice" role="status">
+            {message.text}
+          </div>
+        ))}
+      {/* acima da trilha, para não ficar escondida embaixo da página */}
+      {state?.revealed && state.reference && (
+        <ReferencePanel labels={state.reference} />
       )}
       <TrackBoard
         ref={boardRef}
@@ -332,20 +422,18 @@ export function Teacher({
             onDrop={async (itemId, x, version) => {
               try {
                 await confirm(itemId, snapToTrack(state, itemId, x), version);
-                setMessage(placedMessage(isSharedCard(state, itemId), true));
+                setMessage({
+                  text: placedMessage(isSharedCard(state, itemId), true),
+                  tone: "ok",
+                });
               } catch (error) {
-                setMessage((error as Error).message);
+                setMessage({ text: (error as Error).message, tone: "error" });
               } finally {
                 setLocalPreview(itemId, null);
               }
             }}
           />
         </section>
-      )}
-      {state?.revealed && (
-        <div className="notice" role="status">
-          Referência: {state.reference?.join(" → ")}
-        </div>
       )}
     </main>
   );

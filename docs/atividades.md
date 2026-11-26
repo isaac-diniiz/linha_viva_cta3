@@ -18,15 +18,15 @@ No painel do professor, o menu **Tema da atividade** agrupa as atividades por di
 
 ## Criar uma linha pelo painel do professor
 
-Sem editar arquivos, o professor monta uma linha no botão **Criar linha**, abaixo do menu **Tema da atividade**. Isso só é possível antes de iniciar; depois, use **Reiniciar demonstração**.
+Sem editar arquivos, o professor monta uma linha no botão **Criar linha**, abaixo do menu **Tema da atividade**. Isso só é possível antes de iniciar; depois, use **Nova rodada**.
 
-| Campo do formulário                    | Regra                                                                                                                                                       |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Tema da linha**                      | Obrigatório, até 120 caracteres. Vira o título da atividade.                                                                                                |
-| **Ponta da esquerda** e **da direita** | Obrigatórios, até 40 caracteres cada, como "Mais antigo" e "Mais recente".                                                                                  |
+| Campo do formulário                    | Regra                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Tema da linha**                      | Obrigatório, até 120 caracteres. Vira o título da atividade.                                                                                                       |
+| **Ponta da esquerda** e **da direita** | Obrigatórios, até 40 caracteres cada, como "Mais antigo" e "Mais recente".                                                                                         |
 | **Cartões**                            | De 3 a 40, na ordem correta, da esquerda para a direita. Até 60 caracteres cada, sem texto repetido. **Enter** começa o próximo cartão; ↑ ↓ ✕ reordenam e removem. |
-| **Embaralhar os cartões**              | Ligado por padrão. Entrega os cartões em ordem aleatória e guarda o cartão do professor, como nas atividades de História.                                   |
-| **Disciplina, série, instrução**       | Em "Mais opções", opcionais. Sem disciplina e série, a linha entra no grupo **Minhas linhas**, série **Livre**. Sem instrução, o texto cita as duas pontas. |
+| **Embaralhar os cartões**              | Ligado por padrão. Entrega os cartões em ordem aleatória e guarda o cartão do professor, como nas atividades de História.                                          |
+| **Disciplina, série, instrução**       | Em "Mais opções", opcionais. Sem disciplina e série, a linha entra no grupo **Minhas linhas**, série **Livre**. Sem instrução, o texto cita as duas pontas.        |
 
 Ao criar, o servidor valida o formulário com as mesmas regras dos arquivos, guarda a linha (veja "Onde a linha fica guardada"), inclui no menu e já a seleciona para a turma conectada. Se já existir uma linha com o mesmo tema, o id ganha `-2`, `-3` e assim por diante. Sem Supabase, cada linha criada é um arquivo comum e também pode ser editada à mão, como qualquer outra atividade.
 

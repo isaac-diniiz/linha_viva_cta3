@@ -131,3 +131,207 @@ describe("tela do aluno com vários cartões", () => {
     await waitFor(() => expect(confirm).toHaveBeenCalledWith("i1", 0.5, 7));
   });
 });
+
+describe("tela do aluno na revelação", () => {
+  function show(state: DemoSnapshot) {
+    (useLocalDemo as Mock).mockReturnValue({
+      state,
+      connected: true,
+      error: "",
+      confirm: vi.fn(),
+      preview: vi.fn(),
+      send: vi.fn(),
+    });
+    render(<Student code="ABC12345" />);
+  }
+  const own = [{ id: "i1", label: "Chegada de Cabral ao Brasil" }];
+
+  it("avisa para olhar a projeção, sem mostrar a resposta no celular", () => {
+    show({
+      ...snapshot(own),
+      status: "paused",
+      revealed: true,
+      reference: ["Chegada de Cabral ao Brasil", "Assinatura da Lei Áurea"],
+    });
+    expect(screen.getByText(/resposta foi revelada/i)).toHaveTextContent(
+      /olhe a projeção/i,
+    );
+    expect(
+      screen.queryByText("Assinatura da Lei Áurea"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("não avisa antes da revelação", () => {
+    show(snapshot(own));
+    expect(
+      screen.queryByText(/resposta foi revelada/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe("tela do aluno: mensagens e fechamento", () => {
+  const confirm = vi.fn();
+  beforeEach(() => confirm.mockReset().mockResolvedValue(undefined));
+  const own = [{ id: "i1", label: "Chegada de Cabral ao Brasil" }];
+  function mock(state: DemoSnapshot) {
+    (useLocalDemo as Mock).mockReturnValue({
+      state,
+      connected: true,
+      error: "",
+      confirm,
+      preview: vi.fn(),
+      send: vi.fn(),
+    });
+  }
+  const confirmChoice = () =>
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirmar posição escolhida" }),
+    );
+
+  it("erro ao confirmar aparece como alerta, não como aviso verde", async () => {
+    confirm.mockRejectedValueOnce(new Error("A linha mudou. Tente de novo."));
+    mock(snapshot(own));
+    render(<Student code="ABC12345" />);
+    confirmChoice();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("A linha mudou");
+    expect(alert).toHaveClass("error");
+  });
+
+  it("a mensagem da jogada some quando o professor muda o estado da atividade", async () => {
+    mock(snapshot(own));
+    const { rerender } = render(<Student code="ABC12345" />);
+    confirmChoice();
+    expect(
+      await screen.findByText(/colocada na linha coletiva/),
+    ).toBeInTheDocument();
+    mock({ ...snapshot(own), status: "paused" });
+    rerender(<Student code="ABC12345" />);
+    expect(screen.queryByText(/colocada na linha coletiva/)).toBeNull();
+  });
+
+  it("a mensagem da jogada some na nova rodada, quando a linha recomeça", async () => {
+    mock(snapshot(own));
+    const { rerender } = render(<Student code="ABC12345" />);
+    confirmChoice();
+    await screen.findByText(/colocada na linha coletiva/);
+    // nova rodada já iniciada: a versão da linha volta para trás
+    mock({ ...snapshot(own), version: 1 });
+    rerender(<Student code="ABC12345" />);
+    expect(screen.queryByText(/colocada na linha coletiva/)).toBeNull();
+  });
+
+  it("ao encerrar, mostra um fechamento e tira os controles de posição", () => {
+    mock({ ...snapshot(own), status: "ended" });
+    render(<Student code="ABC12345" />);
+    expect(
+      screen.getByRole("heading", { name: /Atividade encerrada/ }),
+    ).toBeVisible();
+    expect(screen.getByText(/Obrigado por participar/)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Confirmar posição escolhida" }),
+    ).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+  });
+
+  it("ao encerrar, não pede mais para ajustar o voto do grupo", () => {
+    const shared = [
+      { id: "i1", label: "Evaporação" },
+      { id: "colega", label: "Evaporação" },
+    ];
+    mock({ ...snapshot([shared[0]]), items: shared, status: "active" });
+    const { rerender } = render(<Student code="ABC12345" />);
+    expect(screen.getByTestId("shared-card-hint")).toBeInTheDocument();
+    mock({ ...snapshot([shared[0]]), items: shared, status: "ended" });
+    rerender(<Student code="ABC12345" />);
+    expect(screen.queryByTestId("shared-card-hint")).toBeNull();
+  });
+});
+
+describe("tela do aluno: o próprio cartão na revelação", () => {
+  function show(state: DemoSnapshot) {
+    (useLocalDemo as Mock).mockReturnValue({
+      state,
+      connected: true,
+      error: "",
+      confirm: vi.fn(),
+      preview: vi.fn(),
+      send: vi.fn(),
+    });
+    render(<Student code="ABC12345" />);
+  }
+  const line = {
+    items: [
+      { id: "i1", label: "Evaporação" },
+      { id: "i2", label: "Condensação" },
+      { id: "i3", label: "Precipitação" },
+    ],
+    cards: [
+      { id: "cond", label: "Condensação", votes: 1, total: 1, marks: [] },
+      { id: "evap", label: "Evaporação", votes: 1, total: 1, marks: [] },
+    ],
+    confirmedOrder: ["cond", "evap"],
+    confirmedPositions: { cond: 0.1, evap: 0.5 },
+    status: "paused" as const,
+    revealed: true,
+    answer: ["Evaporação", "Condensação", "Precipitação"],
+  };
+  const own = (ids: string[]) =>
+    line.items.filter((item) => ids.includes(item.id));
+
+  it("cartão fora do lugar: diz onde ficou e qual é a casa certa, só no próprio celular", () => {
+    show({ ...snapshot(own(["i1"])), ...line, ownItemIds: ["i1"] });
+    const result = screen.getByRole("region", {
+      name: "Seu cartão na resposta",
+    });
+    expect(result).toHaveTextContent(
+      "Evaporação: ficou na casa 2; a casa certa é a 1.",
+    );
+    expect(result).not.toHaveTextContent("Condensação");
+  });
+
+  it("cartão na casa certa recebe a confirmação", () => {
+    show({
+      ...snapshot(own(["i2"])),
+      ...line,
+      // nesta resposta a Condensação vem primeiro, e é a casa onde ela está
+      answer: ["Condensação", "Evaporação", "Precipitação"],
+      ownItemIds: ["i2"],
+    });
+    expect(
+      screen.getByRole("region", { name: "Seu cartão na resposta" }),
+    ).toHaveTextContent("Condensação: ✓ na casa certa (1)");
+  });
+
+  it("cartão que não foi para a linha mostra a casa certa", () => {
+    show({ ...snapshot(own(["i3"])), ...line, ownItemIds: ["i3"] });
+    expect(
+      screen.getByRole("region", { name: "Seu cartão na resposta" }),
+    ).toHaveTextContent(
+      "Precipitação: não foi para a linha; a casa certa é a 3.",
+    );
+  });
+
+  it("a trilha do celular não compara os cartões dos colegas: a resposta fica na projeção", () => {
+    show({ ...snapshot(own(["i1"])), ...line, ownItemIds: ["i1"] });
+    expect(screen.getByTestId("confirmed-cond")).not.toHaveTextContent(
+      /casa certa/i,
+    );
+    expect(screen.getByTestId("confirmed-evap")).not.toHaveTextContent(
+      /casa certa/i,
+    );
+  });
+
+  it("antes de revelar, não mostra resultado", () => {
+    show({
+      ...snapshot(own(["i1"])),
+      ...line,
+      revealed: false,
+      answer: undefined,
+      ownItemIds: ["i1"],
+    });
+    expect(
+      screen.queryByRole("region", { name: "Seu cartão na resposta" }),
+    ).toBeNull();
+  });
+});

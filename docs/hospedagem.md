@@ -59,7 +59,7 @@ Para trocar a atividade aberta ao iniciar, altere `LINHA_VIVA_TEMA` em **Environ
 1. **5 minutos antes**, abra `https://linha-viva.onrender.com/demo/professor` no computador da sala e entre com sua conta. Se o serviço estava dormindo, a página demora cerca de 1 minuto para carregar; aguarde.
 2. Clique em **Abrir projeção** e leve a aba para o projetor. Confira se o QR Code aparece.
 3. Faça um teste rápido com um celular: entrar pelo QR Code, receber um cartão e ver a caixa se mover na projeção.
-4. Clique em **Reiniciar demonstração** para começar a aula com a sessão limpa.
+4. Clique em **Nova rodada** e confirme para começar a aula com a sessão limpa. Se a atividade anterior foi encerrada, a turma recebe um código novo; senão, o código continua o mesmo.
 
 Deixe a aba do professor ou da projeção aberta durante toda a aula; ela mantém o serviço acordado.
 

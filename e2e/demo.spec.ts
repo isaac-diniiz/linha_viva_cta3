@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { slotPoint } from "./teacher-login";
+import { slotPoint, newRound } from "./teacher-login";
 
 test.skip(
   !process.env.DEMO_MODE,
@@ -20,9 +20,9 @@ test("projeção mostra QR de entrada até a atividade começar", async ({
   const teacher = await browser.newPage();
   await teacher.goto("/demo/professor");
   // a sessão é única no servidor; outro teste pode tê-la deixado iniciada
-  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(teacher);
   await expect(
     teacher.getByRole("button", { name: "Iniciar atividade" }),
   ).toBeEnabled();
@@ -41,6 +41,37 @@ test("projeção mostra QR de entrada até a atividade começar", async ({
 
   await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
   await expect(qr).toHaveCount(0);
+  // quem chega atrasado ainda vê o código da turma
+  const code = (await studentLink.getAttribute("href"))?.split("/").at(-1);
+  await expect(
+    projection.getByRole("region", { name: "Entrar na turma" }),
+  ).toContainText(code ?? "");
+  await expect(
+    projection.getByRole("status", { name: "Estado da atividade" }),
+  ).toHaveText("Em construção");
+  await projection.close();
+  await teacher.close();
+});
+
+test("a referência revelada cabe na tela da projeção", async ({ browser }) => {
+  const teacher = await browser.newPage();
+  await teacher.goto("/demo/professor");
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
+  await expect(reset).toBeEnabled();
+  await newRound(teacher);
+  const projection = await browser.newPage({
+    viewport: { width: 1280, height: 720 },
+  });
+  await projection.goto("/demo/projetor");
+  await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
+  await teacher.getByRole("button", { name: "Revelar referência" }).click();
+  const reference = projection.getByRole("region", {
+    name: "Sequência de referência",
+  });
+  await expect(reference).toBeInViewport({ ratio: 1 });
+  // o tema depende de testes anteriores (reiniciar preserva o tema): só confere que há etapas
+  await expect(reference.getByRole("listitem").first()).toBeVisible();
+  await expect(reference.getByRole("listitem").last()).toBeInViewport();
   await projection.close();
   await teacher.close();
 });
@@ -55,9 +86,9 @@ test("professor escolhe a atividade por disciplina e os alunos recebem cartões 
   ) as { titulo: string; cartoes: { texto: string }[] };
   const teacher = await browser.newPage();
   await teacher.goto("/demo/professor");
-  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(teacher);
   const portuguese = teacher.getByRole("group", { name: "Língua Portuguesa" });
   try {
     // o rádio só fica marcado quando o servidor confirma a troca
@@ -104,7 +135,7 @@ test("professor, aluno e projeção compartilham o movimento antes da confirmaç
   await page.goto("/");
   await page.getByRole("link", { name: "Professor" }).click();
   await expect(page.getByText("CÓDIGO DA TURMA · DEMO1234")).toBeVisible();
-  await page.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(page);
   // 3 cartões por pessoa: a trilha do Ciclo da água fica com 3 casas
   const perParticipant = page.getByLabel("Cartões por participante");
   try {
@@ -152,7 +183,7 @@ test("professor, aluno e projeção compartilham o movimento antes da confirmaç
     await student.close();
   } finally {
     // reiniciar preserva a quantidade: devolve um cartão por participante
-    await page.getByRole("button", { name: "Reiniciar demonstração" }).click();
+    await newRound(page);
     await perParticipant.selectOption("1");
     await expect(perParticipant).toHaveValue("1");
   }
@@ -167,9 +198,9 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
   const teacher = await browser.newPage();
   await teacher.goto("/demo/professor");
   await expect(
-    teacher.getByRole("button", { name: "Reiniciar demonstração" }),
+    teacher.getByRole("button", { name: "Nova rodada" }),
   ).toBeEnabled();
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(teacher);
   await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
   await page.goto("/demo/aluno/DEMO1234");
   const card = page.locator(".drag-card");
@@ -188,6 +219,19 @@ test("aluno no celular pode posicionar pela alternativa ao arraste", async ({
     "data-slot",
     "0",
   );
+  // a marca de confirmado fica fora do cartão, sem cobrir o nome dele
+  const mark = page.locator(".own-cards .placed-mark");
+  await expect(mark).toBeVisible();
+  const cardBox = (await card.boundingBox())!;
+  const markBox = (await mark.boundingBox())!;
+  expect(markBox.y).toBeGreaterThanOrEqual(cardBox.y + cardBox.height - 1);
+  // ao revelar, o aluno vê no próprio celular onde o cartão dele ficou
+  await teacher.getByRole("button", { name: "Revelar referência" }).click();
+  await expect(
+    page.getByRole("region", { name: "Seu cartão na resposta" }),
+  ).toContainText("Evaporação: ✓ na casa certa (1).");
+  // a comparação de todos os cartões fica na projeção, não na trilha do celular
+  await expect(page.locator(".confirmed-card")).not.toContainText("casa certa");
   await teacher.close();
 });
 
@@ -199,9 +243,9 @@ test("no celular em pé, caixas confirmadas próximas não se cobrem", async ({
   test.skip(!isMobile, "Executar no projeto mobile.");
   const teacher = await browser.newPage();
   await teacher.goto("/demo/professor");
-  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(teacher);
   const perParticipant = teacher.getByLabel("Cartões por participante");
   try {
     await perParticipant.selectOption("3");
@@ -257,7 +301,7 @@ test("no celular em pé, caixas confirmadas próximas não se cobrem", async ({
       .toBe(0);
   } finally {
     // devolve um cartão por participante: reiniciar preserva a quantidade
-    await reset.click();
+    await newRound(teacher);
     await perParticipant.selectOption("1");
     await expect(perParticipant).toHaveValue("1");
     await teacher.close();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openTeacher } from "./teacher-login";
+import { openTeacher, newRound } from "./teacher-login";
 
 test.skip(
   !process.env.DEMO_MODE && !process.env.DEMO_PUBLIC_URL,
@@ -27,7 +27,7 @@ test("duas prévias remotas avançam em vários frames entre mensagens", async (
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const oldStudentUrl = await share.getAttribute("href");
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(teacher);
   if (process.env.DEMO_PUBLIC_URL)
     await expect(share).not.toHaveAttribute("href", oldStudentUrl ?? "");
   const studentUrl = (await share.getAttribute("href")) ?? "/demo/aluno";

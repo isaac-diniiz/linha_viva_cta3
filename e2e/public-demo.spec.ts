@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { openTeacher, testInvite } from "./teacher-login";
+import { newRound, openTeacher, testInvite } from "./teacher-login";
 
 test.skip(!process.env.PUBLIC_DEMO_MODE, "Executar com PUBLIC_DEMO_MODE=1.");
 
-test("QR da projeção acompanha o novo código após reiniciar", async ({
+test("QR da projeção mantém o código na nova rodada e acompanha o novo depois de encerrar", async ({
   browser,
 }) => {
   const teacher = await browser.newPage();
@@ -11,7 +11,7 @@ test("QR da projeção acompanha o novo código após reiniciar", async ({
   const studentLink = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(studentLink).toBeVisible();
   // a sessão é única no servidor; outro teste pode tê-la deixado iniciada
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(teacher);
   await expect(
     teacher.getByRole("button", { name: "Iniciar atividade" }),
   ).toBeEnabled();
@@ -25,7 +25,14 @@ test("QR da projeção acompanha o novo código após reiniciar", async ({
   });
   await expect(qr).toBeVisible();
   const oldUrl = await qr.getAttribute("data-join-url");
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  // nova rodada da mesma turma: mesmo código e mesmo QR
+  await newRound(teacher);
+  await expect(
+    teacher.getByRole("button", { name: "Iniciar atividade" }),
+  ).toBeEnabled();
+  await expect(qr).toHaveAttribute("data-join-url", oldUrl ?? "");
+  // depois de encerrar, a nova rodada é de outra turma: código novo
+  await newRound(teacher, { newCode: true });
   await expect(qr).not.toHaveAttribute("data-join-url", oldUrl ?? "");
   // painel e projeção recebem o código novo quase juntos: compara até coincidirem
   await expect
@@ -45,12 +52,12 @@ test("participantes independentes recebem cartões, inclusive repetições, e co
   const teacher = await browser.newPage();
   await openTeacher(teacher);
   await expect(
-    teacher.getByRole("button", { name: "Reiniciar demonstração" }),
+    teacher.getByRole("button", { name: "Nova rodada" }),
   ).toBeEnabled();
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const oldStudentUrl = await share.getAttribute("href");
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(teacher, { newCode: true });
   await expect(share).not.toHaveAttribute("href", oldStudentUrl ?? "");
   const studentUrl = await share.getAttribute("href");
   if (!studentUrl) throw new Error("Link do aluno ausente");
@@ -199,9 +206,9 @@ test("com poucas pessoas, cada participante recebe e posiciona vários cartões"
   test.skip(isMobile, "A quantidade é escolhida no painel do professor.");
   const teacher = await browser.newPage();
   await openTeacher(teacher);
-  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(teacher);
   const perParticipant = teacher.getByLabel("Cartões por participante");
   try {
     await perParticipant.selectOption("2");
@@ -237,7 +244,7 @@ test("com poucas pessoas, cada participante recebe e posiciona vários cartões"
     await projection.close();
   } finally {
     // devolve um cartão por participante: reiniciar preserva a quantidade
-    await reset.click();
+    await newRound(teacher);
     await perParticipant.selectOption("1");
     await expect(perParticipant).toHaveValue("1");
     await teacher.close();
@@ -252,9 +259,9 @@ test("professor pode só conduzir, sem receber cartões", async ({
   test.skip(isMobile, "A escolha é feita no painel do professor.");
   const teacher = await browser.newPage();
   await openTeacher(teacher);
-  const reset = teacher.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = teacher.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(teacher);
   const plays = teacher.getByRole("checkbox", {
     name: "Participar com cartões",
   });
@@ -264,16 +271,18 @@ test("professor pode só conduzir, sem receber cartões", async ({
     await plays.click();
     await expect(plays).not.toBeChecked();
     await expect(teacher.locator(".own-cards .drag-card")).toHaveCount(0);
-    // reiniciar sorteia outro código; espera o link novo antes de usá-lo
+    // encerrar e começar nova rodada sorteia outro código; espera o link novo
     const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
     const oldStudentUrl = await share.getAttribute("href");
-    await reset.click();
+    await newRound(teacher, { newCode: true });
     await expect(share).not.toHaveAttribute("href", oldStudentUrl ?? "");
     await expect(plays).not.toBeChecked();
 
     await page.goto((await share.getAttribute("href"))!);
     await expect(page.locator(".drag-card")).toHaveCount(1);
     await teacher.getByRole("button", { name: "Iniciar atividade" }).click();
+    // depois de iniciar, a preparação fica recolhida; abre para conferir a trava
+    await teacher.getByText("Preparação da atividade").click();
     await expect(plays).toBeDisabled();
     await page
       .getByRole("button", { name: "Confirmar posição escolhida" })
@@ -281,7 +290,7 @@ test("professor pode só conduzir, sem receber cartões", async ({
     await expect(teacher.locator(".confirmed-card")).toHaveCount(1);
   } finally {
     // devolve a participação do professor, preservada ao reiniciar
-    await reset.click();
+    await newRound(teacher);
     if (!(await plays.isChecked())) await plays.click();
     await expect(plays).toBeChecked();
     await teacher.close();
@@ -356,7 +365,7 @@ test("celular em navegador independente confirma pela alternativa ao arraste", a
   const share = teacher.getByRole("link", { name: /\/demo\/aluno\// });
   await expect(share).toBeVisible();
   const oldStudentUrl = await share.getAttribute("href");
-  await teacher.getByRole("button", { name: "Reiniciar demonstração" }).click();
+  await newRound(teacher, { newCode: true });
   await expect(share).not.toHaveAttribute("href", oldStudentUrl ?? "");
   const studentUrl = await share.getAttribute("href");
   if (!studentUrl) throw new Error("Link do aluno ausente");

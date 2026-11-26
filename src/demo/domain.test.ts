@@ -11,6 +11,7 @@ import {
   listThemes,
   ownedItems,
   referenceLabels,
+  answerLabels,
   setCardsPerParticipant,
   setDemoStatus,
   setTeacherPlays,
@@ -480,5 +481,20 @@ describe("demonstração na rede local", () => {
         "Borboleta",
       ]);
     });
+  });
+
+  it("a resposta para comparar na trilha traz o texto de cada cartão em jogo, na ordem certa e sem o ano", () => {
+    const history = theme("historia");
+    const state = createDemoState(history);
+    ["a", "b", "c"].forEach((token) => assignStudent(state, token));
+    const present = new Set(state.items.map((item) => item.templateId));
+    expect(answerLabels(state)).toEqual(
+      history.cards
+        .filter((card) => present.has(card.id))
+        .map((card) => card.label),
+    );
+    expect(answerLabels(state).some((label) => /\(\d{4}\)/.test(label))).toBe(
+      false,
+    );
   });
 });

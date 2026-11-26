@@ -19,7 +19,7 @@ Não precisa de conta nem de internet além da rede local. É o modo usado para 
 2. Abra `http://localhost:5173`, clique em **Professor** e depois em **Abrir projeção**. Se quiser projetar, mova a aba da projeção para a tela da sala.
 3. Em outro PowerShell, execute `ipconfig` e anote o endereço **IPv4** do adaptador Wi-Fi, por exemplo `192.168.1.23`. No celular, no mesmo Wi-Fi, abra `http://192.168.1.23:5173` (troque pelo seu IPv4), clique em **Aluno** e digite o código **DEMO1234**, fixo no modo local.
 4. No professor, clique em **Iniciar atividade**. No celular, arraste o cartão pela linha e observe a projeção _antes de soltar_: a caixa deve acompanhar o gesto. Solte para confirmar, ou use o controle de posição e **Confirmar posição escolhida**.
-5. Teste **Pausar movimentos**, **Retomar atividade** e **Revelar referência**. Para voltar ao começo, clique em **Reiniciar demonstração**.
+5. Teste **Pausar movimentos**, **Retomar atividade** e **Revelar referência**. Para voltar ao começo, clique em **Nova rodada** e confirme.
 
 Se o celular não abrir a página, confira se está no mesmo Wi-Fi, use o IPv4 do adaptador Wi-Fi (não `localhost`, que no celular aponta para o próprio celular) e permita o acesso do Node.js na **rede privada** quando o Windows solicitar. Os dados ficam só na memória do computador; ao parar o terminal, a sessão desaparece.
 
@@ -36,7 +36,7 @@ O Quick Tunnel usa um subdomínio aleatório e não tem garantia de disponibilid
 
 ## Como a atividade funciona
 
-No painel do professor, o menu **Tema da atividade** agrupa as atividades por disciplina e mostra a série de cada uma. Enquanto a atividade está aguardando, o professor escolhe o tema e a turma já conectada recebe cartões novos, no mesmo código e link. Depois de **Iniciar atividade** a escolha fica travada; para mudar, use **Reiniciar demonstração** e escolha de novo. A lista de atividades e o guia para cadastrar novas estão em [docs/atividades.md](docs/atividades.md).
+No painel do professor, o menu **Tema da atividade** agrupa as atividades por disciplina e mostra a série de cada uma. Enquanto a atividade está aguardando, o professor escolhe o tema e a turma já conectada recebe cartões novos, no mesmo código e link. Depois de **Iniciar atividade** a escolha fica travada; para mudar, use **Nova rodada** e escolha de novo. A lista de atividades e o guia para cadastrar novas estão em [docs/atividades.md](docs/atividades.md).
 
 O botão **Criar linha**, logo abaixo do menu, abre um formulário para o professor montar a própria linha, antes de iniciar: o tema, o que fica na ponta da esquerda e na da direita, e os cartões, com a quantidade e o texto de cada um, na ordem correta. A linha criada já entra selecionada e fica salva como arquivo em `atividades/`. Ao digitar os cartões, **Enter** começa o próximo cartão; só o botão **Criar e usar esta linha** finaliza. Com `SUPABASE_URL` e `SUPABASE_SECRET_KEY` definidos, as linhas criadas ficam no Supabase (tabela `demo_lines`, só o servidor acessa) e sobrevivem a reinícios; sem eles, ficam em arquivos de `atividades/`. As linhas criadas aparecem em **Suas linhas criadas**, com os botões **Editar** e **Apagar** (com confirmação), disponíveis antes de iniciar a atividade; as atividades prontas não podem ser editadas nem apagadas pelo painel.
 

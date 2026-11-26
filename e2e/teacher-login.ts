@@ -30,9 +30,9 @@ export async function openTeacher(page: Page) {
  * "Reiniciar" preserva essas escolhas, então um teste anterior pode tê-las mudado.
  */
 export async function restoreDefaults(page: Page) {
-  const reset = page.getByRole("button", { name: "Reiniciar demonstração" });
+  const reset = page.getByRole("button", { name: "Nova rodada" });
   await expect(reset).toBeEnabled();
-  await reset.click();
+  await newRound(page);
   await expect(
     page.getByRole("button", { name: "Iniciar atividade" }),
   ).toBeEnabled();
@@ -70,4 +70,21 @@ export async function slotPoint(page: Page, slot: number) {
     x: box.x + ((col + 0.5) * box.width) / data.columns,
     y: box.y + data.top + (row + 0.5) * data.rowHeight,
   };
+}
+
+/**
+ * Começa uma nova rodada e confirma. Com `newCode`, encerra antes, para a turma
+ * receber outro código (a nova rodada de uma atividade aberta mantém o código).
+ */
+export async function newRound(page: Page, { newCode = false } = {}) {
+  if (newCode) {
+    const end = page.getByRole("button", { name: "Encerrar" });
+    if (await end.isEnabled()) {
+      await end.click();
+      await page.getByRole("button", { name: "Sim, encerrar" }).click();
+      await expect(end).toBeDisabled();
+    }
+  }
+  await page.getByRole("button", { name: "Nova rodada" }).click();
+  await page.getByRole("button", { name: "Sim, nova rodada" }).click();
 }

@@ -37,6 +37,8 @@ export type DemoSnapshot = {
   memberCount: number;
   /** Etapas da referência, já em texto, uma por cartão. */
   reference?: string[];
+  /** Texto dos cartões em jogo na ordem certa; só chega depois de revelar. */
+  answer?: string[];
   /** Quantos cartões cada participante recebe nesta sessão. */
   cardsPerParticipant: number;
   /** O professor recebe cartões ou só conduz a atividade. */

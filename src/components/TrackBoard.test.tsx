@@ -95,4 +95,28 @@ describe("trilha da turma", () => {
       slotCenter(2, 4),
     );
   });
+
+  it("na revelação, diz em texto qual cartão está na casa certa e qual é a casa de cada um fora do lugar", () => {
+    board({
+      slots: 3,
+      order: ["condensacao", "evaporacao", "precipitacao"],
+      positions: { condensacao: 0.1, evaporacao: 0.5, precipitacao: 0.9 },
+      answer: { evaporacao: 0, condensacao: 1, precipitacao: 2 },
+    });
+    const card = (id: string) => screen.getByTestId(`confirmed-${id}`);
+    expect(card("evaporacao")).toHaveTextContent("Casa certa: 1");
+    expect(card("evaporacao")).toHaveClass("out-of-place");
+    expect(card("condensacao")).toHaveTextContent("Casa certa: 2");
+    expect(card("precipitacao")).toHaveTextContent("✓ casa certa");
+    expect(card("precipitacao")).toHaveClass("in-place");
+  });
+
+  it("sem revelar, não indica casa certa", () => {
+    board({
+      slots: 3,
+      order: ["evaporacao"],
+      positions: { evaporacao: 0.1 },
+    });
+    expect(screen.queryByText(/casa certa/i)).toBeNull();
+  });
 });

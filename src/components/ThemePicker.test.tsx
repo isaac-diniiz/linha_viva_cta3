@@ -117,6 +117,6 @@ describe("escolha do tema", () => {
     expect(
       screen.getByRole("radio", { name: /Linha do tempo/ }),
     ).toBeDisabled();
-    expect(screen.getByText(/Reiniciar demonstração/)).toBeInTheDocument();
+    expect(screen.getByText(/Nova rodada/)).toBeInTheDocument();
   });
 });
